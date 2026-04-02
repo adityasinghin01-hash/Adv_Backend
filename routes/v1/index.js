@@ -6,28 +6,38 @@
 const express = require('express');
 const router = express.Router();
 
+const authRoutes = require('./auth.routes');
+const verificationRoutes = require('./verification.routes');
+const passwordRoutes = require('./password.routes');
+const userRoutes = require('./user.routes');
+const contactRoutes = require('./contact.routes');
+const newsletterRoutes = require('./newsletter.routes');
+const waitlistRoutes = require('./waitlist.routes');
+const blogRoutes = require('./blog.routes');
+
 // ── Auth ─────────────────────────────────────────────────
-router.use('/', require('./auth.routes'));
+router.use('/', authRoutes);
 
 // ── Verification ─────────────────────────────────────────
-router.use('/', require('./verification.routes'));
+router.use('/', verificationRoutes);
 
 // ── Password ─────────────────────────────────────────────
-router.use('/password', require('./password.routes'));
+router.use('/password', passwordRoutes);
 
 // ── User (protected) ────────────────────────────────────
-router.use('/', require('./user.routes'));
+router.use('/', userRoutes);
 
 // ── Contact ──────────────────────────────────────────────
-router.use('/contact', require('./contact.routes'));
+router.use('/contact', contactRoutes);
 
 // ── Newsletter ───────────────────────────────────────────
-router.use('/newsletter', require('./newsletter.routes'));
+router.use('/newsletter', newsletterRoutes);
 
 // ── Waitlist ─────────────────────────────────────────────
-router.use('/waitlist', require('./waitlist.routes'));
+router.use('/waitlist', waitlistRoutes);
 
 // ── Blog ─────────────────────────────────────────────────
-router.use('/blog', require('./blog.routes'));
+router.use('/blog', blogRoutes);
 
 module.exports = router;
+

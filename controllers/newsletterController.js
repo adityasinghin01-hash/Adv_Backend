@@ -25,7 +25,7 @@ const subscribe = async (req, res) => {
     // Generate unsubscribe token
     const rawToken = crypto.randomBytes(32).toString('hex');
     const hashedToken = hashToken(rawToken);
-    const unsubscribeUrl = `${config.BASE_URL}/api/newsletter/unsubscribe?token=${rawToken}`;
+    const unsubscribeUrl = `${config.BASE_URL}/api/v1/newsletter/unsubscribe?token=${rawToken}`;
 
     if (existing && !existing.isActive) {
       // Reactivate existing subscriber
