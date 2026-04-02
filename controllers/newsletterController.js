@@ -6,7 +6,7 @@ const { sendEmail } = require('../services/emailService');
 const hashToken = require('../utils/hashToken');
 const config = require('../config/config');
 
-// POST /api/newsletter/subscribe
+// POST /api/v1/newsletter/subscribe
 const subscribe = async (req, res) => {
   try {
     const errors = validationResult(req);
@@ -60,7 +60,7 @@ const subscribe = async (req, res) => {
   }
 };
 
-// POST /api/newsletter/unsubscribe
+// GET /api/v1/newsletter/unsubscribe
 const unsubscribe = async (req, res) => {
   try {
     const { token } = req.query;
@@ -102,7 +102,7 @@ const unsubscribe = async (req, res) => {
   }
 };
 
-// GET /api/newsletter/subscribers — admin only
+// GET /api/v1/newsletter/subscribers — admin only
 const getSubscribers = async (req, res) => {
   try {
     const subscribers = await Subscriber.find({ isActive: true }).sort({ createdAt: -1 });
