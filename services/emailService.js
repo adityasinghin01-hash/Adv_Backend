@@ -32,7 +32,7 @@ const sendEmail = async ({ to, toName, subject, html, text }) => {
 
 // ── Verification Email ───────────────────────────────────
 const sendVerificationEmail = async (email, rawToken, source = 'app') => {
-  const verificationUrl = `${config.BASE_URL}/api/verify-email?token=${rawToken}&source=${source}`;
+  const verificationUrl = `${config.BASE_URL}/api/v1/verify-email?token=${rawToken}&source=${source}`;
   await sendEmail({
     to: email,
     subject: 'Verify Your Email Address',
