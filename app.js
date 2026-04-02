@@ -6,6 +6,8 @@ const express = require('express');
 const helmet = require('helmet');
 const cors = require('cors');
 const mongoSanitize = require('express-mongo-sanitize');
+const xss = require('xss-clean');
+const hpp = require('hpp');
 const config = require('./config/config');
 const { globalLimiter } = require('./middleware/rateLimiter');
 const errorHandler = require('./middleware/errorHandler');
@@ -32,15 +34,27 @@ app.use(helmet({
 app.use(cors({
     origin: config.ALLOWED_ORIGINS,
     credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-API-Key'],
+    maxAge: 86400, // Cache preflight for 24h
 }));
 
 // ── 3. Body Parser (with size limit) ─────────────────────
 // Fixes B-21: old version had no body size limit — DoS vector
 app.use(express.json({ limit: '10kb' }));
+app.use(express.urlencoded({ extended: false, limit: '10kb' }));
 
 // ── 4. Input Sanitization ────────────────────────────────
 // Fixes B-12: old version had zero sanitization — NoSQL injection possible
 app.use(mongoSanitize());
+
+// ── 4b. XSS Sanitization ────────────────────────────────
+// Sanitizes user input in req.body, req.query, req.params
+app.use(xss());
+
+// ── 4c. HTTP Parameter Pollution ─────────────────────────
+// Prevents duplicate query parameters (e.g., ?sort=name&sort=email)
+app.use(hpp());
 
 // ── 5. Request Logger ────────────────────────────────────
 // Fixes B-27: structured request logging on every request
