@@ -1,12 +1,12 @@
-// routes/password.routes.js
+// routes/v1/password.routes.js
 // Password routes — forgot-password, reset-password (POST + GET).
-// Per ARCHITECTURE_MAP §4: Password Routes.
+// Mounted at /api/v1/password by the v1 router.
 
 const express = require('express');
 const router = express.Router();
-const passwordController = require('../controllers/passwordController');
-const { strictLimiter, authLimiter } = require('../middleware/rateLimiter');
-const { schemas } = require('../middleware/validate');
+const passwordController = require('../../controllers/passwordController');
+const { strictLimiter, authLimiter } = require('../../middleware/rateLimiter');
+const { schemas } = require('../../middleware/validate');
 
 // POST /api/forgot
 router.post('/forgot', authLimiter, schemas.forgotPassword, passwordController.forgotPassword);

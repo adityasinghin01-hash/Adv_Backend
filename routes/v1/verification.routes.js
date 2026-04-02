@@ -1,11 +1,11 @@
-// routes/verification.routes.js
+// routes/v1/verification.routes.js
 // Verification routes — verify-email, resend-verification, check-verification-status.
-// Per ARCHITECTURE_MAP §4: Verification Routes.
+// Mounted at /api/v1/ by the v1 router.
 
 const express = require('express');
 const router = express.Router();
-const verificationController = require('../controllers/verificationController');
-const { authLimiter } = require('../middleware/rateLimiter');
+const verificationController = require('../../controllers/verificationController');
+const { authLimiter } = require('../../middleware/rateLimiter');
 
 // GET /api/verify-email?token=<rawToken> — no per-route limiter (global only)
 router.get('/verify-email', verificationController.verifyEmail);

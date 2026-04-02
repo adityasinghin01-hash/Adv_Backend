@@ -1,9 +1,9 @@
 const express = require('express');
 const router = express.Router();
 const { body } = require('express-validator');
-const { joinWaitlist, getWaitlist, exportWaitlist } = require('../controllers/waitlistController');
+const { joinWaitlist, getWaitlist, exportWaitlist } = require('../../controllers/waitlistController');
 const rateLimit = require('express-rate-limit');
-const adminMiddleware = require('../middleware/adminMiddleware');
+const adminMiddleware = require('../../middleware/adminMiddleware');
 
 // Rate limiter — 5 requests per hour per IP
 const waitlistLimiter = rateLimit({
