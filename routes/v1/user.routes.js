@@ -1,11 +1,11 @@
-// routes/user.routes.js
+// routes/v1/user.routes.js
 // User routes — profile, dashboard (protected).
-// Per ARCHITECTURE_MAP §4: User Routes.
+// Mounted at /api/v1/ by the v1 router.
 
 const express = require('express');
 const router = express.Router();
-const userController = require('../controllers/userController');
-const { protect } = require('../middleware/authMiddleware');
+const userController = require('../../controllers/userController');
+const { protect } = require('../../middleware/authMiddleware');
 
 // GET /api/profile — protected (requires valid access token)
 router.get('/profile', protect, userController.getProfile);

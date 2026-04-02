@@ -64,17 +64,11 @@ app.use(httpLogger);
 app.use('/api', globalLimiter);
 
 // ── 7. Routes ────────────────────────────────────────────
-// Routes will be mounted here as they are created in later phases.
-// Example (uncommented when route files exist):
+// Health check is unversioned — Render probes /api/health directly.
 app.use('/api', require('./routes/health.routes'));
-app.use('/api', require('./routes/auth.routes'));
-app.use('/api', require('./routes/verification.routes'));
-app.use('/api/password', require('./routes/password.routes'));
-app.use('/api', require('./routes/user.routes'));
-app.use('/api/contact', require('./routes/contact.routes'));
-app.use('/api/newsletter', require('./routes/newsletter.routes'));
-app.use('/api/waitlist', require('./routes/waitlist.routes'));
-app.use('/api/blog', require('./routes/blog.routes'));
+
+// All versioned routes under /api/v1/
+app.use('/api/v1', require('./routes/v1'));
 
 // ── 8. Global Error Handler (MUST be last) ───────────────
 app.use(errorHandler);

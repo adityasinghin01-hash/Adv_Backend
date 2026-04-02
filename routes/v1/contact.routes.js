@@ -2,7 +2,7 @@
 const express = require('express');
 const router = express.Router();
 const { body } = require('express-validator');
-const { submitContact } = require('../controllers/contactController');
+const { submitContact } = require('../../controllers/contactController');
 const rateLimit = require('express-rate-limit');
 
 // Rate limiter — 5 requests per hour per IP

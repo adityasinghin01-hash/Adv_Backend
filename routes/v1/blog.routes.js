@@ -7,9 +7,9 @@ const {
   getPostBySlug,
   updatePost,
   deletePost,
-} = require('../controllers/blogController');
+} = require('../../controllers/blogController');
 const rateLimit = require('express-rate-limit');
-const adminMiddleware = require('../middleware/adminMiddleware');
+const adminMiddleware = require('../../middleware/adminMiddleware');
 
 // Rate limiter for public routes
 const blogReadLimiter = rateLimit({
