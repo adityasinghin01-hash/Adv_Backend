@@ -1,32 +1,23 @@
 // middleware/requestLogger.js
+// Morgan HTTP request logger — pipes to central Winston logger.
+// Includes request ID for log correlation.
 
-const winston = require('winston');
 const morgan = require('morgan');
+const logger = require('../config/logger');
 
-const logger = winston.createLogger({
-  level: process.env.NODE_ENV === 'production' ? 'info' : 'debug',
-  format: winston.format.combine(
-    winston.format.timestamp({ format: 'YYYY-MM-DD HH:mm:ss' }),
-    winston.format.errors({ stack: true }),
-    process.env.NODE_ENV === 'production'
-      ? winston.format.json()
-      : winston.format.combine(
-          winston.format.colorize(),
-          winston.format.printf(({ timestamp, level, message, ...meta }) => {
-            const metaStr = Object.keys(meta).length ? ` ${JSON.stringify(meta)}` : '';
-            return `${timestamp} [${level}]: ${message}${metaStr}`;
-          })
-        )
-  ),
-  transports: [new winston.transports.Console()],
-});
-
+// ── Morgan → Winston bridge ──────────────────────────────
 const stream = { write: (message) => logger.http(message.trim()) };
+
+// Skip health check to reduce noise
 const skip = (req) => req.originalUrl === '/api/health';
 
+// Custom token: request ID from requestId middleware
+morgan.token('request-id', (req) => req.id || '-');
+
 const httpLogger = morgan(
-  ':method :url :status :res[content-length] - :response-time ms [:remote-addr]',
-  { stream, skip }
+    ':request-id :method :url :status :res[content-length] - :response-time ms [:remote-addr]',
+    { stream, skip }
 );
 
-module.exports = { logger, httpLogger };
+module.exports = { httpLogger };
+

@@ -3,7 +3,7 @@
 // with request ID correlation for production debugging.
 // MUST be the last middleware in app.js (after routes).
 
-const { logger } = require('./requestLogger');
+const logger = require('../config/logger');
 
 const errorHandler = (err, req, res, next) => {
     // ── Determine status code ────────────────────────────────

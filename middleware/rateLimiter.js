@@ -3,7 +3,7 @@
 const rateLimit = require('express-rate-limit');
 const { Ratelimit } = require('@upstash/ratelimit');
 const { Redis } = require('@upstash/redis');
-const { logger } = require('./requestLogger');
+const logger = require('../config/logger');
 
 let useRedis = false;
 let upstashLimiters = null;

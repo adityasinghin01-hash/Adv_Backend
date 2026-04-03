@@ -56,21 +56,26 @@ app.use(xss());
 // Prevents duplicate query parameters (e.g., ?sort=name&sort=email)
 app.use(hpp());
 
-// ── 5. Request Logger ────────────────────────────────────
-// Fixes B-27: structured request logging on every request
+// ── 5. Request ID ────────────────────────────────────────
+// Generates UUID per request for log correlation
+const requestId = require('./middleware/requestId');
+app.use(requestId);
+
+// ── 6. Request Logger ────────────────────────────────────
+// Structured request logging — includes request ID
 app.use(httpLogger);
 
-// ── 6. Global Rate Limiter ───────────────────────────────
+// ── 7. Global Rate Limiter ───────────────────────────────
 app.use('/api', globalLimiter);
 
-// ── 7. Routes ────────────────────────────────────────────
+// ── 8. Routes ────────────────────────────────────────────
 // Health check is unversioned — Render probes /api/health directly.
 app.use('/api', require('./routes/health.routes'));
 
 // All versioned routes under /api/v1/
 app.use('/api/v1', require('./routes/v1'));
 
-// ── 8. Global Error Handler (MUST be last) ───────────────
+// ── 9. Global Error Handler (MUST be last) ───────────────
 app.use(errorHandler);
 
 module.exports = app;
