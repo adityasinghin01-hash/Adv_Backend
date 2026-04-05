@@ -12,6 +12,7 @@ const generateAccessToken = (user) => {
         {
             id: user._id,
             email: user.email,
+            role: user.role, // Added role for RBAC
             isVerified: user.isVerified,
             jti: crypto.randomBytes(16).toString('hex'), // Ensures uniqueness
         },
@@ -27,6 +28,7 @@ const generateRefreshToken = (user, rememberMe = false) => {
         {
             id: user._id,
             email: user.email,
+            role: user.role, // Added role for RBAC
             rememberMe,
             jti: crypto.randomBytes(16).toString('hex'), // Ensures uniqueness
         },
