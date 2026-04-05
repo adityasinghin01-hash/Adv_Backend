@@ -11,6 +11,7 @@ const hashToken = require('../utils/hashToken');
 const validatePassword = require('../utils/passwordValidator');
 const { generateAccessToken, generateRefreshToken } = require('../services/tokenService');
 const { sendVerificationEmail } = require('../services/emailService');
+const { createDefaultFreeSubscription } = require('../services/subscriptionService');
 
 const googleClient = new OAuth2Client(config.GOOGLE_CLIENT_ID);
 
@@ -87,6 +88,7 @@ const signup = async (req, res, next) => {
             verificationToken: hashToken(rawToken),
             verificationTokenExpiry: Date.now() + VERIFICATION_TOKEN_EXPIRY,
             isVerified: false,
+            pendingSubscriptionCreation: true,
         });
 
         const accessToken = generateAccessToken(newUser);
@@ -98,6 +100,18 @@ const signup = async (req, res, next) => {
         });
 
         await newUser.save(); // Single save — fixes B-04
+
+        // Attempt durable subscription creation (blocks response slightly, but ensures consistency)
+        try {
+            const sub = await createDefaultFreeSubscription(newUser._id);
+            await User.findByIdAndUpdate(newUser._id, { 
+                activeSubscription: sub._id,
+                pendingSubscriptionCreation: false 
+            });
+        } catch (err) {
+            console.error('⚠️ [Signup] Failed to create default subscription. Will be reconciled later:', err.message);
+            // pendingSubscriptionCreation remains true via schema default
+        }
 
         setImmediate(async () => {
             try {
