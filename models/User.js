@@ -53,6 +53,13 @@ const userSchema = new mongoose.Schema(
             default: false,
         },
 
+        // ── Subscription ─────────────────────────────────────
+        activeSubscription: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: 'Subscription',
+            default: null,
+        },
+
         // ── Verification ──────────────────────────────────────
         isVerified: {
             type: Boolean,

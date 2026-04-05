@@ -11,6 +11,7 @@ const hashToken = require('../utils/hashToken');
 const validatePassword = require('../utils/passwordValidator');
 const { generateAccessToken, generateRefreshToken } = require('../services/tokenService');
 const { sendVerificationEmail } = require('../services/emailService');
+const { createDefaultFreeSubscription } = require('../services/subscriptionService');
 
 const googleClient = new OAuth2Client(config.GOOGLE_CLIENT_ID);
 
@@ -98,6 +99,16 @@ const signup = async (req, res, next) => {
         });
 
         await newUser.save(); // Single save — fixes B-04
+
+        // Assign default free subscription (non-blocking — don't fail signup if plan missing)
+        setImmediate(async () => {
+            try {
+                const sub = await createDefaultFreeSubscription(newUser._id);
+                await User.findByIdAndUpdate(newUser._id, { activeSubscription: sub._id });
+            } catch (err) {
+                console.error('⚠️ [Signup] Failed to create default subscription:', err.message);
+            }
+        });
 
         setImmediate(async () => {
             try {
