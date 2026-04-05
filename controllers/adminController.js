@@ -12,8 +12,10 @@ const { roles } = require('../config/roles');
  */
 exports.getAllUsers = async (req, res, next) => {
     try {
-        const page = parseInt(req.query.page, 10) || 1;
-        const limit = parseInt(req.query.limit, 10) || 10;
+        const rawPage = parseInt(req.query.page, 10);
+        const rawLimit = parseInt(req.query.limit, 10);
+        const page = Number.isFinite(rawPage) ? Math.max(1, rawPage) : 1;
+        const limit = Number.isFinite(rawLimit) ? Math.max(1, Math.min(100, rawLimit)) : 10;
         const skip = (page - 1) * limit;
 
         const users = await User.find()
@@ -54,12 +56,8 @@ exports.updateUserRole = async (req, res, next) => {
         }
 
         // 2. Prevent non-superadmins from granting or revoking superadmin status
-        if ((role === roles.SUPERADMIN || req.user.role !== roles.SUPERADMIN) && req.user.role !== roles.SUPERADMIN) {
-           // If they are trying to assign superadmin OR edit a superadmin, and they aren't one:
-           // Actually, let's just do a simple check. If requested role is superadmin, current user must be superadmin.
-           if (role === roles.SUPERADMIN && req.user.role !== roles.SUPERADMIN) {
-               return res.status(403).json({ success: false, message: 'Only superadmins can grant superadmin privileges' });
-           }
+        if (role === roles.SUPERADMIN && req.user.role !== roles.SUPERADMIN) {
+            return res.status(403).json({ success: false, message: 'Only superadmins can grant superadmin privileges' });
         }
 
         const targetUser = await User.findById(targetUserId);
@@ -117,7 +115,7 @@ exports.toggleUserBan = async (req, res, next) => {
         }
 
         if (targetUser._id.toString() === req.user.id) {
-            return res.status(400).json({ success: false, message: 'Cannot naturally ban yourself' });
+            return res.status(400).json({ success: false, message: 'Cannot ban yourself' });
         }
 
         targetUser.isBanned = isBanned;
@@ -143,9 +141,11 @@ exports.toggleUserBan = async (req, res, next) => {
  */
 exports.getSystemStats = async (req, res, next) => {
     try {
-        const totalUsers = await User.countDocuments();
-        const verifiedUsers = await User.countDocuments({ isVerified: true });
-        const bannedUsers = await User.countDocuments({ isBanned: true });
+        const [totalUsers, verifiedUsers, bannedUsers] = await Promise.all([
+            User.countDocuments(),
+            User.countDocuments({ isVerified: true }),
+            User.countDocuments({ isBanned: true })
+        ]);
 
         // Count by role
         const roleDistribution = await User.aggregate([

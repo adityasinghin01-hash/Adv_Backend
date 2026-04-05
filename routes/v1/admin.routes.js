@@ -11,6 +11,17 @@ const adminController = require('../../controllers/adminController');
 // All admin routes require authentication
 router.use(authMiddleware);
 
+// Block banned users from all admin routes
+router.use((req, res, next) => {
+    if (req.user && req.user.isBanned) {
+        return res.status(403).json({
+            success: false,
+            message: 'Forbidden: Account banned'
+        });
+    }
+    next();
+});
+
 // ── GET /api/v1/admin/users
 router.get(
     '/users',
