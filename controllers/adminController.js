@@ -14,7 +14,8 @@ exports.getAllUsers = async (req, res, next) => {
     try {
         const rawPage = parseInt(req.query.page, 10);
         const rawLimit = parseInt(req.query.limit, 10);
-        const page = Number.isFinite(rawPage) ? Math.max(1, rawPage) : 1;
+        const MAX_PAGE = 1000;
+        const page = Number.isFinite(rawPage) ? Math.min(Math.max(1, rawPage), MAX_PAGE) : 1;
         const limit = Number.isFinite(rawLimit) ? Math.max(1, Math.min(100, rawLimit)) : 10;
         const skip = (page - 1) * limit;
 

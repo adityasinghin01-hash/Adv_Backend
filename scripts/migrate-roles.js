@@ -12,8 +12,7 @@ const migrateRoles = async () => {
 
     try {
         if (!process.env.MONGO_URI) {
-            console.error('❌ MONGO_URI environment variable is not set.');
-            process.exit(1);
+            throw new Error('MONGO_URI environment variable is not set.');
         }
 
         console.log(`Connecting to database at ${process.env.MONGO_URI.split('@')[1]}...`);
@@ -25,14 +24,14 @@ const migrateRoles = async () => {
 
         let migratedCount = 0;
 
-        const cursor = User.find({ role: { $exists: false } }).cursor();
-        for await (const user of cursor) {
-            const newRole = user.isAdmin ? roles.ADMIN : roles.USER;
+        const cursor = User.collection.find({ role: { $exists: false } }).stream();
+        for await (const doc of cursor) {
+            const newRole = doc.isAdmin ? roles.ADMIN : roles.USER;
 
             await User.updateOne(
-                { _id: user._id },
+                { _id: doc._id },
                 {
-                    $set: { role: newRole, isBanned: user.isBanned ?? false },
+                    $set: { role: newRole, isBanned: doc.isBanned ?? false },
                     $unset: { isAdmin: '' }
                 }
             );
