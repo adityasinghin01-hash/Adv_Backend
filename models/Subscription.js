@@ -33,6 +33,12 @@ const subscriptionSchema = new mongoose.Schema(
         currentPeriodEnd: {
             type: Date,
             required: true,
+            validate: {
+                validator: function (v) {
+                    return this.currentPeriodStart ? v >= this.currentPeriodStart : true;
+                },
+                message: 'currentPeriodEnd must be greater than or equal to currentPeriodStart',
+            },
         },
 
         cancelAtPeriodEnd: {
@@ -41,8 +47,8 @@ const subscriptionSchema = new mongoose.Schema(
         },
 
         usage: {
-            apiCalls: { type: Number, default: 0 },
-            storage:  { type: Number, default: 0 },  // in MB
+            apiCalls: { type: Number, default: 0, min: [0, 'usage.apiCalls cannot be negative'] },
+            storage:  { type: Number, default: 0, min: [0, 'usage.storage cannot be negative'] },  // in MB
         },
     },
     {

@@ -4,6 +4,8 @@
 const Plan = require('../models/Plan');
 const Subscription = require('../models/Subscription');
 const logger = require('../config/logger');
+const mongoose = require('mongoose');
+const User = require('../models/User');
 
 /**
  * @route   GET /api/v1/subscriptions/plans
@@ -115,20 +117,38 @@ exports.changePlan = async (req, res, next) => {
         const isUpgrade = targetPlan.price > currentSub.planId.price;
         const now = new Date();
 
-        // Cancel current subscription
-        currentSub.status = 'cancelled';
-        await currentSub.save();
+        const session = await mongoose.startSession();
+        session.startTransaction();
 
-        // Create new subscription with fresh billing period
-        const newSub = await Subscription.create({
-            userId: req.user.id,
-            planId: targetPlan._id,
-            status: 'active',
-            currentPeriodStart: now,
-            currentPeriodEnd: new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000), // 30 days
-            cancelAtPeriodEnd: false,
-            usage: { apiCalls: 0, storage: 0 },
-        });
+        let newSub;
+        try {
+            // Cancel current subscription
+            currentSub.status = 'cancelled';
+            await currentSub.save({ session });
+
+            // Create new subscription with fresh billing period
+            const [createdSub] = await Subscription.create([{
+                userId: req.user.id,
+                planId: targetPlan._id,
+                status: 'active',
+                currentPeriodStart: now,
+                currentPeriodEnd: new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000), // 30 days
+                cancelAtPeriodEnd: false,
+                usage: { apiCalls: 0, storage: 0 },
+            }], { session });
+            
+            newSub = createdSub;
+
+            // Update user's activeSubscription reference
+            await User.findByIdAndUpdate(req.user.id, { activeSubscription: newSub._id }, { session });
+
+            await session.commitTransaction();
+        } catch (err) {
+            await session.abortTransaction();
+            throw err;
+        } finally {
+            session.endSession();
+        }
 
         logger.info(`User ${req.user.id} ${isUpgrade ? 'upgraded' : 'downgraded'} from '${currentSub.planId.name}' to '${targetPlan.name}'`);
 

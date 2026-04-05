@@ -59,6 +59,10 @@ const userSchema = new mongoose.Schema(
             ref: 'Subscription',
             default: null,
         },
+        pendingSubscriptionCreation: {
+            type: Boolean,
+            default: true,
+        },
 
         // ── Verification ──────────────────────────────────────
         isVerified: {

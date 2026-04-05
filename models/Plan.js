@@ -45,10 +45,32 @@ const planSchema = new mongoose.Schema(
         },
 
         limits: {
-            apiCallsPerMonth: { type: Number, required: true },  // -1 = unlimited
-            maxApiKeys:       { type: Number, required: true },
-            webhooksAllowed:  { type: Number, required: true },  // -1 = unlimited
-            storageGB:        { type: Number, required: true },
+            apiCallsPerMonth: {
+                type: Number,
+                required: true,
+                validate: {
+                    validator: (v) => v === -1 || v >= 0,
+                    message: 'apiCallsPerMonth must be -1 (unlimited) or >= 0',
+                },
+            },
+            maxApiKeys: {
+                type: Number,
+                required: true,
+                min: [0, 'maxApiKeys must be >= 0'],
+            },
+            webhooksAllowed: {
+                type: Number,
+                required: true,
+                validate: {
+                    validator: (v) => v === -1 || v >= 0,
+                    message: 'webhooksAllowed must be -1 (unlimited) or >= 0',
+                },
+            },
+            storageGB: {
+                type: Number,
+                required: true,
+                min: [0, 'storageGB must be >= 0'],
+            },
         },
 
         isActive: {

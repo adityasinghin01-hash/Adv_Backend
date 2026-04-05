@@ -5,6 +5,7 @@
 const Subscription = require('../models/Subscription');
 const Plan = require('../models/Plan');
 const logger = require('../config/logger');
+const { enforceLimit } = require('../services/subscriptionService');
 
 /**
  * Middleware factory that restricts access to users on specific plans.
@@ -74,38 +75,29 @@ const checkLimit = (limitKey) => {
             }
 
             const plan = subscription.planId;
-            const limit = plan.limits[limitKey];
-
-            // -1 means unlimited
-            if (limit === -1) {
-                req.subscription = subscription;
-                req.plan = plan;
-                return next();
+            // Fail closed on unknown/invalid limitKey from schema
+            if (plan.limits[limitKey] === undefined) {
+                logger.error(`Middleware misconfiguration: Limit key '${limitKey}' not found in plan limits`);
+                return res.status(500).json({ success: false, message: 'Internal server error' });
             }
 
-            // Map limitKey to the corresponding usage field
-            const usageMap = {
-                apiCallsPerMonth: subscription.usage.apiCalls,
-                maxApiKeys: null,       // checked at creation time, not via usage counter
-                webhooksAllowed: null,   // checked at creation time, not via usage counter
-            };
+            // Atomic check and increment via service
+            const result = await enforceLimit(req.user.id, limitKey, 1);
 
-            const currentUsage = usageMap[limitKey];
+            if (!result.allowed) {
+                // If it's a key that cannot be checked/incremented per-request (like maxApiKeys)
+                if (result.reason === 'Unsupported rate-limited key') {
+                    logger.error(`Middleware misconfiguration: checkLimit used for unsupported key '${limitKey}'. This limit should be checked at resource creation time.`);
+                    return res.status(500).json({ success: false, message: 'Internal server error' });
+                }
 
-            // For count-based limits (apiKeys, webhooks), skip — they are checked at resource creation
-            if (currentUsage === null || currentUsage === undefined) {
-                req.subscription = subscription;
-                req.plan = plan;
-                return next();
-            }
-
-            if (currentUsage >= limit) {
-                logger.warn(`Limit exceeded: User ${req.user.id} hit ${limitKey} limit (${currentUsage}/${limit})`);
+                // Normal limit exceeded
+                logger.warn(`Limit exceeded: User ${req.user.id} hit ${limitKey} limit (${result.currentUsage}/${result.limit})`);
                 return res.status(429).json({
                     success: false,
                     message: `Plan limit reached for ${limitKey}. Please upgrade your plan.`,
-                    limit,
-                    currentUsage,
+                    limit: result.limit,
+                    currentUsage: result.currentUsage,
                     currentPlan: plan.name,
                 });
             }
