@@ -4,6 +4,7 @@
 
 const mongoose = require('mongoose');
 const bcrypt = require('bcrypt');
+const { roles } = require('../config/roles');
 
 const userSchema = new mongoose.Schema(
     {
@@ -40,8 +41,14 @@ const userSchema = new mongoose.Schema(
             type: String, // Google profile picture URL
         },
 
-        // ── Role ─────────────────────────────────────────────
-        isAdmin: {
+        // ── Role & Moderation ─────────────────────────────────
+        role: {
+            type: String,
+            enum: Object.values(roles), // ['user', 'moderator', 'admin', 'superadmin']
+            default: roles.USER,
+        },
+
+        isBanned: {
             type: Boolean,
             default: false,
         },

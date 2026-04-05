@@ -196,6 +196,7 @@ const login = async (req, res, next) => {
             user: {
                 id: user._id,
                 email: user.email,
+                role: user.role,
                 isVerified: user.isVerified,
             },
         });
@@ -260,6 +261,7 @@ const googleLogin = async (req, res, next) => {
                 email: user.email,
                 name: user.name,
                 picture: user.picture,
+                role: user.role,
                 isVerified: user.isVerified,
             },
         });

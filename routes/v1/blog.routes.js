@@ -9,7 +9,9 @@ const {
   deletePost,
 } = require('../../controllers/blogController');
 const rateLimit = require('express-rate-limit');
-const adminMiddleware = require('../../middleware/adminMiddleware');
+const { protect: authMiddleware } = require('../../middleware/authMiddleware');
+const { authorize } = require('../../middleware/rbacMiddleware');
+const { permissions } = require('../../config/roles');
 
 // Rate limiter for public routes
 const blogReadLimiter = rateLimit({
@@ -49,8 +51,8 @@ router.get('/', blogReadLimiter, getPosts);
 router.get('/:slug', blogReadLimiter, getPostBySlug);
 
 // Admin only routes
-router.post('/', adminMiddleware, postValidation, createPost);
-router.put('/:slug', adminMiddleware, postValidation, updatePost);
-router.delete('/:slug', adminMiddleware, deletePost);
+router.post('/', authMiddleware, authorize(permissions.MODERATE_POSTS), postValidation, createPost);
+router.put('/:slug', authMiddleware, authorize(permissions.MODERATE_POSTS), postValidation, updatePost);
+router.delete('/:slug', authMiddleware, authorize(permissions.MODERATE_POSTS), deletePost);
 
 module.exports = router;

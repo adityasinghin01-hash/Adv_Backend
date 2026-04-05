@@ -3,7 +3,9 @@ const router = express.Router();
 const { body } = require('express-validator');
 const { joinWaitlist, getWaitlist, exportWaitlist } = require('../../controllers/waitlistController');
 const rateLimit = require('express-rate-limit');
-const adminMiddleware = require('../../middleware/adminMiddleware');
+const { protect: authMiddleware } = require('../../middleware/authMiddleware');
+const { authorize } = require('../../middleware/rbacMiddleware');
+const { permissions } = require('../../config/roles');
 
 // Rate limiter — 5 requests per hour per IP
 const waitlistLimiter = rateLimit({
@@ -31,7 +33,7 @@ const joinValidation = [
 router.post('/join', waitlistLimiter, joinValidation, joinWaitlist);
 
 // Admin only routes
-router.get('/', adminMiddleware, getWaitlist);
-router.get('/export', adminMiddleware, exportWaitlist);
+router.get('/', authMiddleware, authorize(permissions.READ_USERS), getWaitlist);
+router.get('/export', authMiddleware, authorize(permissions.READ_USERS), exportWaitlist);
 
 module.exports = router;

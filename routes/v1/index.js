@@ -14,6 +14,7 @@ const contactRoutes = require('./contact.routes');
 const newsletterRoutes = require('./newsletter.routes');
 const waitlistRoutes = require('./waitlist.routes');
 const blogRoutes = require('./blog.routes');
+const adminRoutes = require('./admin.routes');
 
 // ── Auth ─────────────────────────────────────────────────
 router.use('/', authRoutes);
@@ -38,6 +39,9 @@ router.use('/waitlist', waitlistRoutes);
 
 // ── Blog ─────────────────────────────────────────────────
 router.use('/blog', blogRoutes);
+
+// ── Admin ────────────────────────────────────────────────
+router.use('/admin', adminRoutes);
 
 module.exports = router;
 
