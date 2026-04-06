@@ -76,13 +76,15 @@ exports.revokeKey = async (req, res, next) => {
     try {
         const { id } = req.params;
 
-        const apiKey = await ApiKey.findOne({ _id: id, userId: req.user.id, isActive: true });
-        if (!apiKey) {
+        // Atomic update — no separate find-then-save race condition
+        const revoked = await ApiKey.findOneAndUpdate(
+            { _id: id, userId: req.user.id, isActive: true },
+            { $set: { isActive: false } }
+        );
+
+        if (!revoked) {
             return res.status(404).json({ success: false, message: 'API Key not found or already inactive.' });
         }
-
-        apiKey.isActive = false;
-        await apiKey.save();
 
         res.status(200).json({
             success: true,
@@ -116,6 +118,7 @@ exports.rotateKey = async (req, res, next) => {
                     name: newApiKeyDoc.name,
                     keyPrefix: newApiKeyDoc.keyPrefix,
                     scopes: newApiKeyDoc.scopes,
+                    expiresAt: newApiKeyDoc.expiresAt,
                     createdAt: newApiKeyDoc.createdAt,
                     isActive: newApiKeyDoc.isActive,
                 }

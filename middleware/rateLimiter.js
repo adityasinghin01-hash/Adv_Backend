@@ -1,5 +1,6 @@
 // middleware/rateLimiter.js
 
+const crypto = require('crypto');
 const rateLimit = require('express-rate-limit');
 const { ipKeyGenerator } = require('express-rate-limit');
 const { Ratelimit } = require('@upstash/ratelimit');
@@ -61,9 +62,16 @@ const globalLimiter = makeRedisMiddleware('global', 200, 15 * 60 * 1000);
 const authLimiter   = makeRedisMiddleware('auth',   10,  15 * 60 * 1000);
 const strictLimiter = makeRedisMiddleware('strict', 20,  15 * 60 * 1000);
 
-// API Limiter tracking by X-API-Key header, query param, or fallback to IP
+// API Limiter — tracks by hashed API key (never raw) or falls back to IP.
+// SECURITY: Raw API key is never stored in logs, response headers, or rate-limit stores.
 const apiLimiter    = makeRedisMiddleware('api', 1000, 15 * 60 * 1000, (req) => {
-    return req.header('X-API-Key') || req.query.apiKey || ipKeyGenerator(req);
+    const rawKey = req.header('X-API-Key');
+    if (rawKey) {
+        const hashed = crypto.createHash('sha256').update(rawKey).digest('hex').substring(0, 16);
+        return `api:${hashed}`;
+    }
+    return ipKeyGenerator(req);
 });
 
 module.exports = { globalLimiter, authLimiter, strictLimiter, apiLimiter };
+

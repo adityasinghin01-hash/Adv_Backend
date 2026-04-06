@@ -33,7 +33,7 @@ const joinValidation = [
 router.post('/join', waitlistLimiter, joinValidation, joinWaitlist);
 
 // Admin only routes
-router.get('/', authMiddleware, authorize(permissions.READ_USERS), getWaitlist);
-router.get('/export', authMiddleware, authorize(permissions.READ_USERS), exportWaitlist);
+router.get('/', authMiddleware(), authorize(permissions.READ_USERS), getWaitlist);
+router.get('/export', authMiddleware(), authorize(permissions.READ_USERS), exportWaitlist);
 
 module.exports = router;

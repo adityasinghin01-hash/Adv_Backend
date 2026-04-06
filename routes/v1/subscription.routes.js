@@ -10,7 +10,7 @@ const subscriptionController = require('../../controllers/subscriptionController
 router.get('/plans', subscriptionController.listPlans);
 
 // ── All routes below require authentication ──────────────
-router.use(authMiddleware);
+router.use(authMiddleware());
 
 // ── GET /api/v1/subscriptions/current — Private
 router.get('/current', subscriptionController.getCurrentPlan);

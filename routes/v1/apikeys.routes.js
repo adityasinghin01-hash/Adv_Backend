@@ -8,7 +8,7 @@ const { protect } = require('../../middleware/authMiddleware');
 
 // SECURITY: All API key management routes require active JWT authentication 
 // from a frontend session. API keys CANNOT be used to manage API keys.
-router.use(protect);
+router.use(protect());
 
 router.post('/', apiKeyController.createKey);
 router.get('/', apiKeyController.listKeys);

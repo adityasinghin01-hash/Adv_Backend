@@ -9,7 +9,7 @@ const { permissions } = require('../../config/roles');
 const adminController = require('../../controllers/adminController');
 
 // All admin routes require authentication
-router.use(authMiddleware);
+router.use(authMiddleware());
 
 // Block banned users from all admin routes
 router.use((req, res, next) => {

@@ -10,9 +10,15 @@ const config = require('../config/config');
 const KEY_PREFIX = 'sk_live_';
 
 /**
- * Generate a new raw key, extract UI prefix, and create the HMAC SHA-256 hash
+ * Generate a new raw key, extract UI prefix, and create the HMAC SHA-256 hash.
+ * Throws if API_KEY_SALT is not configured — prevents running with a default/empty salt.
  */
 const generateKeyData = () => {
+    // Fail fast if salt is missing — critical security requirement
+    if (!config.API_KEY_SALT) {
+        throw new Error('API_KEY_SALT is required. Cannot hash API keys without a configured salt.');
+    }
+
     // Generate secure random bytes (e.g., 48 base64 characters, filtering non-alphanumerics)
     const rawSecret = crypto.randomBytes(36).toString('base64').replace(/[^a-zA-Z0-9]/g, '');
     const rawKey = `${KEY_PREFIX}${rawSecret}`;
@@ -23,7 +29,7 @@ const generateKeyData = () => {
 
     // HMAC SHA-256 Hash
     const keyHash = crypto
-        .createHmac('sha256', config.API_KEY_SALT || 'fallback_salt_value')
+        .createHmac('sha256', config.API_KEY_SALT)
         .update(rawKey)
         .digest('hex');
 
@@ -31,10 +37,12 @@ const generateKeyData = () => {
 };
 
 /**
- * Create a new API key while enforcing plan limitations
+ * Create a new API key while enforcing plan limitations.
+ * Uses a MongoDB session/transaction to atomically check the count and create
+ * the key, preventing concurrent over-allocation race conditions.
  */
 exports.createApiKey = async (userId, name, scopes = ['api:read']) => {
-    // Verify user plan and limits
+    // Verify user plan and limits (outside transaction — read-only)
     const activeSub = await Subscription.findOne({ userId, status: 'active' }).populate('planId');
     if (!activeSub || !activeSub.planId) {
         const err = new Error('User does not have an active subscription');
@@ -44,29 +52,39 @@ exports.createApiKey = async (userId, name, scopes = ['api:read']) => {
 
     const { maxApiKeys } = activeSub.planId.limits;
 
-    if (maxApiKeys !== -1) {
-        const currentActiveKeys = await ApiKey.countDocuments({ userId, isActive: true });
-        if (currentActiveKeys >= maxApiKeys) {
-            const err = new Error(`Plan limit reached: Maximum of ${maxApiKeys} API key(s) allowed on the ${activeSub.planId.displayName} plan.`);
-            err.statusCode = 429;
-            throw err;
-        }
-    }
-
-    // Generate keys securely
+    // Generate keys securely (will throw if salt is missing)
     const { rawKey, storedPrefix, keyHash } = generateKeyData();
 
-    const apiKeyDoc = new ApiKey({
-        userId,
-        name,
-        keyHash,
-        keyPrefix: storedPrefix,
-        scopes,
-    });
+    // Atomic count-and-create inside a transaction to prevent race conditions
+    const session = await mongoose.startSession();
+    session.startTransaction();
 
-    await apiKeyDoc.save();
+    try {
+        if (maxApiKeys !== -1) {
+            const currentActiveKeys = await ApiKey.countDocuments({ userId, isActive: true }).session(session);
+            if (currentActiveKeys >= maxApiKeys) {
+                const err = new Error(`Plan limit reached: Maximum of ${maxApiKeys} API key(s) allowed on the ${activeSub.planId.displayName} plan.`);
+                err.statusCode = 429;
+                throw err;
+            }
+        }
 
-    return { rawKey, apiKeyDoc };
+        const [apiKeyDoc] = await ApiKey.create([{
+            userId,
+            name,
+            keyHash,
+            keyPrefix: storedPrefix,
+            scopes,
+        }], { session });
+
+        await session.commitTransaction();
+        return { rawKey, apiKeyDoc };
+    } catch (error) {
+        await session.abortTransaction();
+        throw error;
+    } finally {
+        session.endSession();
+    }
 };
 
 /**

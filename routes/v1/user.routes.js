@@ -8,9 +8,9 @@ const userController = require('../../controllers/userController');
 const { protect } = require('../../middleware/authMiddleware');
 
 // GET /api/profile — protected (requires valid access token)
-router.get('/profile', protect, userController.getProfile);
+router.get('/profile', protect(), userController.getProfile);
 
 // GET /api/dashboard — protected (requires valid access token)
-router.get('/dashboard', protect, userController.getDashboard);
+router.get('/dashboard', protect(), userController.getDashboard);
 
 module.exports = router;
