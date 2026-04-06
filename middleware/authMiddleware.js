@@ -1,19 +1,23 @@
 // middleware/authMiddleware.js
 // JWT access token verification — attaches full DB user to req.user.
-// Fixes B-01: early-return pattern, no ambiguous control flow.
-// Fixes B-06: req.user is a Mongoose document (not JWT payload), so
-//             getDashboard can read user.refreshTokens.length correctly.
+// Supports automatic fallback to API Key authentication for external integrations.
 
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 const config = require('../config/config');
+const apiKeyMiddleware = require('./apiKeyMiddleware');
 
 const protect = async (req, res, next) => {
     const authHeader = req.headers.authorization;
 
-    // No header or wrong format → reject immediately
+    // Fallback: If no Bearer token is provided, check for API Key
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
-        return res.status(401).json({ message: 'Unauthorized — no token provided' });
+        const rawKey = req.header('X-API-Key') || req.query.apiKey;
+        if (rawKey) {
+            // Delegate auth entirely to API key middleware
+            return apiKeyMiddleware()(req, res, next);
+        }
+        return res.status(401).json({ message: 'Unauthorized — no Bearer token or API key provided' });
     }
 
     const token = authHeader.split(' ')[1];
@@ -29,6 +33,8 @@ const protect = async (req, res, next) => {
         }
 
         req.user = user; // Full Mongoose document, not JWT payload
+        req.authType = 'jwt'; // Explicitly mark the auth context
+        
         next();
     } catch (error) {
         return res.status(401).json({ message: 'Unauthorized — invalid token' });
