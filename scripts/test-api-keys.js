@@ -70,7 +70,7 @@ async function requestWithRetry(method, path, headers = {}, body = null, retries
 
   // Step 1: Login
   console.log('\n=== Step 1: Login ===');
-  const login = await request('POST', '/api/v1/login', {}, {
+  const login = await requestWithRetry('POST', '/api/v1/login', {}, {
     email, password
   });
   assert(login.status === 200, `Login → ${login.status} (expected 200)`);
@@ -78,25 +78,30 @@ async function requestWithRetry(method, path, headers = {}, body = null, retries
 
   // Step 2: No auth → 401
   console.log('\n=== Step 2: No auth → 401 ===');
-  const noAuth = await request('GET', '/api/v1/profile');
+  const noAuth = await requestWithRetry('GET', '/api/v1/profile');
   assert(noAuth.status === 401, `No auth → ${noAuth.status} (expected 401)`);
   const noAuthMsg = String(noAuth?.data?.message || '');
   assert(!noAuthMsg.includes('API key'), `Message: "${noAuthMsg}"`);
 
   // Step 3: Query string API key is ignored (logged as warning, returns 401 like no-auth)
   console.log('\n=== Step 3: Query string API key → 401 ===');
-  const qsKey = await request('GET', '/api/v1/profile?apiKey=sk_live_fake');
+  const qsKey = await requestWithRetry('GET', '/api/v1/profile?apiKey=sk_live_fake');
   assert(qsKey.status === 401, `Query key → ${qsKey.status} (expected 401)`);
 
   // Step 4: Create API key
   console.log('\n=== Step 4: Create API key ===');
-  const create = await request('POST', '/api/v1/apikeys', {
+  const create = await requestWithRetry('POST', '/api/v1/apikeys', {
     Authorization: `Bearer ${TOKEN}`
   }, { name: 'Review Smoke Test', scopes: ['api:read'] });
   assert(create.status === 201, `Create → ${create.status} (expected 201)`);
   
   if (create.status !== 201 || !create?.data?.data) {
     console.error('❌ FATAL: API Key creation failed or missing data. Payload:', create?.data);
+    process.exit(1);
+  }
+
+  if (!create.data.data.key) {
+    console.error('❌ FATAL: create.data.data.key missing. Payload:', create.data);
     process.exit(1);
   }
 
@@ -109,33 +114,43 @@ async function requestWithRetry(method, path, headers = {}, body = null, retries
 
   // Step 5: List keys
   console.log('\n=== Step 5: List keys via JWT ===');
-  const list = await request('GET', '/api/v1/apikeys', {
+  const list = await requestWithRetry('GET', '/api/v1/apikeys', {
     Authorization: `Bearer ${TOKEN}`
   });
   assert(list.status === 200, `List → ${list.status} (expected 200)`);
+  if (!list?.data || list.data.count === undefined) {
+    console.error('❌ FATAL: list.data missing. Payload:', list?.data);
+    process.exit(1);
+  }
   assert(list.data.count >= 1, `Count: ${list.data.count}`);
 
   // Step 6: X-API-Key on JWT-only route → 401 (no implicit fallback)
   console.log('\n=== Step 6: X-API-Key on JWT-only route → 401 ===');
-  const noFallback = await request('GET', '/api/v1/profile', {
+  const noFallback = await requestWithRetry('GET', '/api/v1/profile', {
     'X-API-Key': RAW_KEY
   });
   assert(noFallback.status === 401, `No fallback → ${noFallback.status} (expected 401)`);
 
   // Step 7: Revoke key
   console.log('\n=== Step 7: Revoke key ===');
-  const revoke = await request('DELETE', `/api/v1/apikeys/${KEY_ID}`, {
+  const revoke = await requestWithRetry('DELETE', `/api/v1/apikeys/${KEY_ID}`, {
     Authorization: `Bearer ${TOKEN}`
   });
   assert(revoke.status === 200, `Revoke → ${revoke.status} (expected 200)`);
 
   // Step 8: Verify revoked key no longer appears in active list
   console.log('\n=== Step 8: Revoked key absent from list ===');
-  const postRevoke = await request('GET', '/api/v1/apikeys', {
+  const postRevoke = await requestWithRetry('GET', '/api/v1/apikeys', {
     Authorization: `Bearer ${TOKEN}`
   });
   assert(postRevoke.status === 200, `List after revoke → ${postRevoke.status} (expected 200)`);
-  const revokedStillListed = (postRevoke.data.data || []).some(
+
+  if (!postRevoke?.data?.data) {
+    console.error('❌ FATAL: postRevoke.data.data missing. Payload:', postRevoke?.data);
+    process.exit(1);
+  }
+
+  const revokedStillListed = postRevoke.data.data.some(
     k => String(k._id) === String(KEY_ID)
   );
   assert(!revokedStillListed, `Revoked key absent from active list`);
