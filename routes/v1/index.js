@@ -17,6 +17,7 @@ const blogRoutes = require('./blog.routes');
 const adminRoutes = require('./admin.routes');
 const subscriptionRoutes = require('./subscription.routes');
 const apiKeyRoutes = require('./apikeys.routes');
+const webhookRoutes = require('./webhooks.routes');
 
 // ── Auth ─────────────────────────────────────────────────
 router.use('/', authRoutes);
@@ -50,6 +51,9 @@ router.use('/subscriptions', subscriptionRoutes);
 
 // ── API Keys ─────────────────────────────────────────────
 router.use('/apikeys', apiKeyRoutes);
+
+// ── Webhooks ─────────────────────────────────────────────
+router.use('/webhooks', webhookRoutes);
 
 module.exports = router;
 
