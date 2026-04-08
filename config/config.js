@@ -3,7 +3,7 @@
 // In production, dotenv is NOT loaded — env vars come from Render dashboard.
 
 if (process.env.NODE_ENV !== 'production') {
-    require('dotenv').config();
+    require('dotenv').config({ override: false });
 }
 
 const config = {
