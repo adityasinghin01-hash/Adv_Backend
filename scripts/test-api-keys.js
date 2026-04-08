@@ -21,8 +21,9 @@ function request(method, path, headers = {}, body = null) {
       path: url.pathname + url.search,
       headers: { ...headers },
     };
+    let data = null;
     if (body) {
-      const data = JSON.stringify(body);
+      data = JSON.stringify(body);
       opts.headers['Content-Type'] = 'application/json';
       opts.headers['Content-Length'] = Buffer.byteLength(data);
     }
@@ -39,9 +40,25 @@ function request(method, path, headers = {}, body = null) {
       req.destroy(new Error('Request timeout'));
     });
     req.on('error', reject);
-    if (body) req.write(JSON.stringify(body));
+    if (data) req.write(data);
     req.end();
   });
+}
+
+/**
+ * Simple retry wrapper for the `request` helper.
+ * Retries on HTTP 429 (Too Many Requests) with exponential back‑off.
+ */
+async function requestWithRetry(method, path, headers = {}, body = null, retries = 3, backoff = 2000) {
+  let attempt = 0;
+  while (true) {
+    const resp = await request(method, path, headers, body);
+    if (resp.status !== 429 || attempt >= retries) return resp;
+    attempt++;
+    const wait = backoff * Math.pow(2, attempt - 1);
+    console.log(`⏳ Received 429 – retry ${attempt}/${retries} after ${wait} ms`);
+    await new Promise(r => setTimeout(r, wait));
+  }
 }
 
 (async () => {
@@ -77,9 +94,17 @@ function request(method, path, headers = {}, body = null) {
     Authorization: `Bearer ${TOKEN}`
   }, { name: 'Review Smoke Test', scopes: ['api:read'] });
   assert(create.status === 201, `Create → ${create.status} (expected 201)`);
+  
+  if (create.status !== 201 || !create?.data?.data) {
+    console.error('❌ FATAL: API Key creation failed or missing data. Payload:', create?.data);
+    process.exit(1);
+  }
+
   assert(create.data.data.key.expiresAt !== undefined, 'Response includes expiresAt');
   const RAW_KEY = create.data.data.rawKey;
-  const KEY_ID = create.data.data.key.id;
+  const KEY_ID = create.data.data.id;
+  assert(typeof RAW_KEY === 'string' && RAW_KEY.length > 0, `RAW_KEY invalid`);
+  assert(typeof KEY_ID === 'string' && KEY_ID.length > 0, `KEY_ID invalid`);
   console.log(`  Key: (redacted)`);
 
   // Step 5: List keys
