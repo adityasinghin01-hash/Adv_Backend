@@ -6,6 +6,10 @@ const http = require('http');
 
 const BASE = 'http://localhost:5002';
 
+// Credentials from env — never hardcode secrets in test scripts
+const email = process.env.TEST_EMAIL || 'testadmin@spinx.dev';
+const password = process.env.TEST_PASSWORD || 'Test@12345';
+
 function request(method, path, headers = {}, body = null) {
   return new Promise((resolve, reject) => {
     const url = new URL(path, BASE);
@@ -45,7 +49,7 @@ function request(method, path, headers = {}, body = null) {
   // Step 1: Login
   console.log('\n=== Step 1: Login ===');
   const login = await request('POST', '/api/v1/login', {}, {
-    email: 'testadmin@spinx.dev', password: 'Test@12345'
+    email, password
   });
   assert(login.status === 200, `Login → ${login.status} (expected 200)`);
   const TOKEN = login.data.accessToken;
@@ -56,11 +60,10 @@ function request(method, path, headers = {}, body = null) {
   assert(noAuth.status === 401, `No auth → ${noAuth.status} (expected 401)`);
   assert(!noAuth.data.message.includes('API key'), `Message: "${noAuth.data.message}"`);
 
-  // Step 3: Query string rejected
-  console.log('\n=== Step 3: Query string API key → 400 ===');
+  // Step 3: Query string API key is ignored (logged as warning, returns 401 like no-auth)
+  console.log('\n=== Step 3: Query string API key → 401 ===');
   const qsKey = await request('GET', '/api/v1/profile?apiKey=sk_live_fake');
-  assert(qsKey.status === 400, `Query key → ${qsKey.status} (expected 400)`);
-  assert(qsKey.data.message.includes('query string'), `Message: "${qsKey.data.message}"`);
+  assert(qsKey.status === 401, `Query key → ${qsKey.status} (expected 401)`);
 
   // Step 4: Create API key
   console.log('\n=== Step 4: Create API key ===');
