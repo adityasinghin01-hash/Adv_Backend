@@ -83,8 +83,8 @@ webhookSchema.pre('updateOne', function () {
   }
 });
 
-// Compound index for fast lookups of active webhooks per user
-webhookSchema.index({ userId: 1, isActive: 1 });
+// Compound index for emit() query: { userId, isActive: true, events: event }
+webhookSchema.index({ userId: 1, isActive: 1, events: 1 });
 
 const Webhook = mongoose.model('Webhook', webhookSchema);
 

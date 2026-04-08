@@ -42,7 +42,7 @@ exports.createWebhook = async (req, res, next) => {
       description: description || '',
     });
 
-    logger.info('Webhook created', { webhookId: webhook._id, userId: req.user.id, url });
+    logger.info('Webhook created', { webhookId: webhook._id, userId: req.user.id });
 
     res.status(201).json({
       success: true,
@@ -191,14 +191,20 @@ exports.deleteWebhook = async (req, res, next) => {
       return res.status(404).json({ success: false, message: 'Webhook not found.' });
     }
 
-    // Clean up orphaned delivery records
-    const { deletedCount } = await WebhookDelivery.deleteMany({ webhookId: webhook._id });
-
-    logger.info('Webhook deleted', {
-      webhookId: webhook._id,
-      userId: req.user.id,
-      deliveriesDeleted: deletedCount,
-    });
+    // Best-effort cleanup of orphaned delivery records
+    try {
+      const { deletedCount } = await WebhookDelivery.deleteMany({ webhookId: webhook._id });
+      logger.info('Webhook deleted', {
+        webhookId: webhook._id,
+        userId: req.user.id,
+        deliveriesDeleted: deletedCount,
+      });
+    } catch (cleanupErr) {
+      logger.error('Failed to clean up delivery records (webhook already deleted)', {
+        webhookId: webhook._id,
+        error: cleanupErr.message,
+      });
+    }
 
     res.status(200).json({ success: true, message: 'Webhook deleted successfully.' });
   } catch (error) {

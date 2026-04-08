@@ -12,6 +12,10 @@ const logger = require('../config/logger');
 const DISPATCH_TIMEOUT = 10000; // 10 seconds
 const MAX_ATTEMPTS = 4;
 const RETRY_DELAYS = [30000, 60000, 300000]; // 30s, 60s, 5min
+const MAX_RESPONSE_BYTES = 1024; // Cap response body collection
+
+// Module-level Map of pending retry timers: deliveryId → setTimeout handle
+const retryTimers = new Map();
 
 // ── Encryption Key ───────────────────────────────────────
 // AES-256-GCM requires a 32-byte key (64 hex chars).
@@ -161,11 +165,17 @@ const dispatchWithRetry = async (webhook, event, payload, attempt = 1) => {
   return new Promise((resolve) => {
     const req = https.request(options, (res) => {
       const chunks = [];
-      res.on('data', (d) => chunks.push(d));
+      let byteCount = 0;
+      res.on('data', (d) => {
+        if (byteCount < MAX_RESPONSE_BYTES) {
+          chunks.push(d);
+          byteCount += d.length;
+        }
+      });
       res.on('end', async () => {
-        const bodyStr = Buffer.concat(chunks).toString('utf8');
+        const bodyStr = Buffer.concat(chunks).toString('utf8').slice(0, MAX_RESPONSE_BYTES);
         const isSuccess = res.statusCode >= 200 && res.statusCode < 300;
-        const truncatedBody = bodyStr.slice(0, 1000);
+        const truncatedBody = bodyStr;
 
         try {
           await WebhookDelivery.create({
@@ -249,7 +259,8 @@ const dispatchWithRetry = async (webhook, event, payload, attempt = 1) => {
 
 /**
  * Schedule a retry via setTimeout if attempts remain.
- * Also persists nextRetryAt to the delivery record for durability across restarts.
+ * Persists nextRetryAt to DB for durability. setTimeout is the in-process owner;
+ * when it fires it atomically claims the delivery first to prevent duplicates.
  */
 const scheduleRetry = async (webhook, event, payload, currentAttempt) => {
   if (currentAttempt >= MAX_ATTEMPTS) {
@@ -266,12 +277,14 @@ const scheduleRetry = async (webhook, event, payload, currentAttempt) => {
   const nextRetryAt = new Date(Date.now() + delay);
 
   // Persist nextRetryAt on the latest failed delivery so the retry worker can find it
+  let deliveryId;
   try {
-    await WebhookDelivery.findOneAndUpdate(
+    const updated = await WebhookDelivery.findOneAndUpdate(
       { webhookId: webhook._id, event, attempt: currentAttempt, success: false },
       { $set: { nextRetryAt } },
-      { sort: { deliveredAt: -1 } }
+      { sort: { deliveredAt: -1 }, returnDocument: 'after' }
     );
+    if (updated) deliveryId = updated._id;
   } catch (dbErr) {
     logger.error('Failed to persist nextRetryAt', { error: dbErr.message });
   }
@@ -284,7 +297,31 @@ const scheduleRetry = async (webhook, event, payload, currentAttempt) => {
     nextRetryAt: nextRetryAt.toISOString(),
   });
 
-  setTimeout(() => {
+  // setTimeout is the in-process retry owner; it atomically claims before dispatching
+  const timerId = setTimeout(async () => {
+    retryTimers.delete(String(deliveryId || timerId));
+
+    // Atomically claim — if the worker already grabbed it, claimed will be null
+    if (deliveryId) {
+      try {
+        const claimed = await WebhookDelivery.findOneAndUpdate(
+          { _id: deliveryId, nextRetryAt: { $exists: true }, success: false },
+          { $unset: { nextRetryAt: 1 } },
+          { returnDocument: 'after' }
+        );
+        if (!claimed) {
+          logger.info('Retry already claimed by worker, skipping setTimeout dispatch', {
+            deliveryId,
+            webhookId: webhook._id,
+          });
+          return;
+        }
+      } catch (claimErr) {
+        logger.error('Failed to claim delivery for retry', { error: claimErr.message });
+        // Proceed anyway — worst case is a duplicate, which the endpoint should handle
+      }
+    }
+
     dispatchWithRetry(webhook, event, payload, nextAttempt).catch((err) => {
       logger.error('Webhook retry unexpected error', {
         webhookId: webhook._id,
@@ -294,6 +331,8 @@ const scheduleRetry = async (webhook, event, payload, currentAttempt) => {
       });
     });
   }, delay);
+
+  retryTimers.set(String(deliveryId || timerId), timerId);
 };
 
 // ── Persistent Retry Worker ──────────────────────────────
@@ -371,6 +410,7 @@ const startWebhookRetryWorker = () => {
 
 /**
  * Stop the background retry worker. Call during graceful shutdown.
+ * Also clears all pending in-process retry timers.
  */
 const stopWebhookRetryWorker = () => {
   if (retryWorkerTimer) {
@@ -378,6 +418,14 @@ const stopWebhookRetryWorker = () => {
     retryWorkerTimer = null;
     logger.info('🛑 Webhook retry worker stopped');
   }
+  // Clear all pending retry timers
+  for (const [key, timerId] of retryTimers) {
+    clearTimeout(timerId);
+  }
+  if (retryTimers.size > 0) {
+    logger.info(`🛑 Cleared ${retryTimers.size} pending retry timer(s)`);
+  }
+  retryTimers.clear();
 };
 
 module.exports = {

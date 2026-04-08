@@ -58,8 +58,9 @@ const gracefulShutdown = async (signal) => {
     server.close(async () => {
         logger.info('HTTP server closed — all connections drained.');
 
-        // Stop the webhook retry worker before closing DB
+        // Stop the webhook retry worker and wait for in-flight dispatches
         stopWebhookRetryWorker();
+        await new Promise(resolve => setTimeout(resolve, 2000));
 
         try {
             // Flush any in-flight API key usage stat updates
