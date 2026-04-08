@@ -54,16 +54,17 @@ const gracefulShutdown = async (signal) => {
     // Mark as not ready — health check will return 503
     app.locals.isReady = false;
 
-    // Stop accepting new connections and drain existing ones
+    // 1. Stop the webhook retry worker — no new retries scheduled
+    stopWebhookRetryWorker();
+    // 2. Wait for in-flight dispatches to settle
+    await new Promise(resolve => setTimeout(resolve, 2000));
+
+    // 3. Stop accepting new HTTP connections and drain existing ones
     server.close(async () => {
         logger.info('HTTP server closed — all connections drained.');
 
-        // Stop the webhook retry worker and wait for in-flight dispatches
-        stopWebhookRetryWorker();
-        await new Promise(resolve => setTimeout(resolve, 2000));
-
         try {
-            // Flush any in-flight API key usage stat updates
+            // 4. Flush any in-flight API key usage stat updates
             await drainPendingUpdates();
             logger.info('API key pending updates flushed.');
         } catch (err) {
@@ -71,6 +72,7 @@ const gracefulShutdown = async (signal) => {
         }
 
         try {
+            // 5. Close MongoDB connection last
             await mongoose.connection.close(false);
             logger.info('MongoDB connection closed.');
         } catch (err) {

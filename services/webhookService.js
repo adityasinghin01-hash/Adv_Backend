@@ -12,7 +12,7 @@ const logger = require('../config/logger');
 const DISPATCH_TIMEOUT = 10000; // 10 seconds
 const MAX_ATTEMPTS = 4;
 const RETRY_DELAYS = [30000, 60000, 300000]; // 30s, 60s, 5min
-const MAX_RESPONSE_BYTES = 1024; // Cap response body collection
+const MAX_RESPONSE_BYTES = 1000; // Matches WebhookDelivery.responseBody maxlength
 
 // Module-level Map of pending retry timers: deliveryId → setTimeout handle
 const retryTimers = new Map();
@@ -167,18 +167,20 @@ const dispatchWithRetry = async (webhook, event, payload, attempt = 1) => {
       const chunks = [];
       let byteCount = 0;
       res.on('data', (d) => {
-        if (byteCount < MAX_RESPONSE_BYTES) {
-          chunks.push(d);
-          byteCount += d.length;
-        }
+        if (byteCount >= MAX_RESPONSE_BYTES) return;
+        const remaining = MAX_RESPONSE_BYTES - byteCount;
+        const slice = d.length > remaining ? d.slice(0, remaining) : d;
+        chunks.push(slice);
+        byteCount += slice.length;
       });
       res.on('end', async () => {
         const bodyStr = Buffer.concat(chunks).toString('utf8').slice(0, MAX_RESPONSE_BYTES);
         const isSuccess = res.statusCode >= 200 && res.statusCode < 300;
         const truncatedBody = bodyStr;
 
+        let savedDeliveryId;
         try {
-          await WebhookDelivery.create({
+          const delivery = await WebhookDelivery.create({
             webhookId: webhook._id,
             userId: webhook.userId,
             event,
@@ -192,6 +194,7 @@ const dispatchWithRetry = async (webhook, event, payload, attempt = 1) => {
               ? new Date(Date.now() + (RETRY_DELAYS[attempt - 1] || RETRY_DELAYS[RETRY_DELAYS.length - 1]))
               : undefined,
           });
+          savedDeliveryId = delivery._id;
         } catch (dbErr) {
           logger.error('Failed to save WebhookDelivery', { error: dbErr.message });
         }
@@ -212,7 +215,7 @@ const dispatchWithRetry = async (webhook, event, payload, attempt = 1) => {
             attempt,
             status: res.statusCode,
           });
-          scheduleRetry(webhook, event, payload, attempt);
+          scheduleRetry(webhook, event, payload, attempt, savedDeliveryId);
         }
         resolve();
       });
@@ -223,8 +226,9 @@ const dispatchWithRetry = async (webhook, event, payload, attempt = 1) => {
     });
 
     req.on('error', async (err) => {
+      let savedDeliveryId;
       try {
-        await WebhookDelivery.create({
+        const delivery = await WebhookDelivery.create({
           webhookId: webhook._id,
           userId: webhook.userId,
           event,
@@ -237,6 +241,7 @@ const dispatchWithRetry = async (webhook, event, payload, attempt = 1) => {
             ? new Date(Date.now() + (RETRY_DELAYS[attempt - 1] || RETRY_DELAYS[RETRY_DELAYS.length - 1]))
             : undefined,
         });
+        savedDeliveryId = delivery._id;
       } catch (dbErr) {
         logger.error('Failed to save WebhookDelivery', { error: dbErr.message });
       }
@@ -248,7 +253,7 @@ const dispatchWithRetry = async (webhook, event, payload, attempt = 1) => {
         attempt,
         error: err.message,
       });
-      scheduleRetry(webhook, event, payload, attempt);
+      scheduleRetry(webhook, event, payload, attempt, savedDeliveryId);
       resolve();
     });
 
@@ -261,8 +266,14 @@ const dispatchWithRetry = async (webhook, event, payload, attempt = 1) => {
  * Schedule a retry via setTimeout if attempts remain.
  * Persists nextRetryAt to DB for durability. setTimeout is the in-process owner;
  * when it fires it atomically claims the delivery first to prevent duplicates.
+ *
+ * @param {object} webhook        - Webhook document
+ * @param {string} event          - Event name
+ * @param {object} payload        - Event data
+ * @param {number} currentAttempt - Just-completed attempt number
+ * @param {string} [deliveryId]   - The _id of the WebhookDelivery record to retry
  */
-const scheduleRetry = async (webhook, event, payload, currentAttempt) => {
+const scheduleRetry = async (webhook, event, payload, currentAttempt, deliveryId) => {
   if (currentAttempt >= MAX_ATTEMPTS) {
     logger.error('Webhook delivery exhausted all retries', {
       webhookId: webhook._id,
@@ -276,22 +287,19 @@ const scheduleRetry = async (webhook, event, payload, currentAttempt) => {
   const nextAttempt = currentAttempt + 1;
   const nextRetryAt = new Date(Date.now() + delay);
 
-  // Persist nextRetryAt on the latest failed delivery so the retry worker can find it
-  let deliveryId;
-  try {
-    const updated = await WebhookDelivery.findOneAndUpdate(
-      { webhookId: webhook._id, event, attempt: currentAttempt, success: false },
-      { $set: { nextRetryAt } },
-      { sort: { deliveredAt: -1 }, returnDocument: 'after' }
-    );
-    if (updated) deliveryId = updated._id;
-  } catch (dbErr) {
-    logger.error('Failed to persist nextRetryAt', { error: dbErr.message });
+  // Persist nextRetryAt on the specific delivery record so the retry worker can find it
+  if (deliveryId) {
+    try {
+      await WebhookDelivery.findByIdAndUpdate(deliveryId, { $set: { nextRetryAt } });
+    } catch (dbErr) {
+      logger.error('Failed to persist nextRetryAt', { deliveryId, error: dbErr.message });
+    }
   }
 
   logger.info('Webhook retry scheduled', {
     webhookId: webhook._id,
     event,
+    deliveryId,
     nextAttempt,
     delayMs: delay,
     nextRetryAt: nextRetryAt.toISOString(),
@@ -318,13 +326,22 @@ const scheduleRetry = async (webhook, event, payload, currentAttempt) => {
         }
       } catch (claimErr) {
         logger.error('Failed to claim delivery for retry', { error: claimErr.message });
-        // Proceed anyway — worst case is a duplicate, which the endpoint should handle
       }
     }
 
-    dispatchWithRetry(webhook, event, payload, nextAttempt).catch((err) => {
-      logger.error('Webhook retry unexpected error', {
+    // Re-fetch webhook to detect deactivation/deletion/URL changes since scheduling
+    const latest = await Webhook.findById(webhook._id);
+    if (!latest || !latest.isActive) {
+      logger.warn('Webhook retry skipped — webhook inactive or deleted since scheduling', {
         webhookId: webhook._id,
+        event,
+      });
+      return;
+    }
+
+    dispatchWithRetry(latest, event, payload, nextAttempt).catch((err) => {
+      logger.error('Webhook retry unexpected error', {
+        webhookId: latest._id,
         event,
         attempt: nextAttempt,
         error: err.message,
