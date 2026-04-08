@@ -5,6 +5,7 @@
 const http = require('http');
 
 const BASE = 'http://localhost:5002';
+const REQUEST_TIMEOUT = 10000;
 
 // Credentials from env — never hardcode secrets in test scripts
 const email = process.env.TEST_EMAIL || 'testadmin@spinx.dev';
@@ -26,12 +27,16 @@ function request(method, path, headers = {}, body = null) {
       opts.headers['Content-Length'] = Buffer.byteLength(data);
     }
     const req = http.request(opts, (res) => {
+      req.setTimeout(0);
       let chunks = '';
       res.on('data', d => chunks += d);
       res.on('end', () => {
         try { resolve({ status: res.statusCode, data: JSON.parse(chunks) }); }
         catch { resolve({ status: res.statusCode, data: chunks }); }
       });
+    });
+    req.setTimeout(REQUEST_TIMEOUT, () => {
+      req.destroy(new Error('Request timeout'));
     });
     req.on('error', reject);
     if (body) req.write(JSON.stringify(body));
@@ -58,7 +63,8 @@ function request(method, path, headers = {}, body = null) {
   console.log('\n=== Step 2: No auth → 401 ===');
   const noAuth = await request('GET', '/api/v1/profile');
   assert(noAuth.status === 401, `No auth → ${noAuth.status} (expected 401)`);
-  assert(!noAuth.data.message.includes('API key'), `Message: "${noAuth.data.message}"`);
+  const noAuthMsg = String(noAuth?.data?.message || '');
+  assert(!noAuthMsg.includes('API key'), `Message: "${noAuthMsg}"`);
 
   // Step 3: Query string API key is ignored (logged as warning, returns 401 like no-auth)
   console.log('\n=== Step 3: Query string API key → 401 ===');
@@ -74,7 +80,7 @@ function request(method, path, headers = {}, body = null) {
   assert(create.data.data.key.expiresAt !== undefined, 'Response includes expiresAt');
   const RAW_KEY = create.data.data.rawKey;
   const KEY_ID = create.data.data.key.id;
-  console.log(`  Key: ${RAW_KEY.substring(0, 20)}...`);
+  console.log(`  Key: (redacted)`);
 
   // Step 5: List keys
   console.log('\n=== Step 5: List keys via JWT ===');
@@ -98,13 +104,16 @@ function request(method, path, headers = {}, body = null) {
   });
   assert(revoke.status === 200, `Revoke → ${revoke.status} (expected 200)`);
 
-  // Step 8: Revoked key no longer works
-  console.log('\n=== Step 8: Revoked key rejected ===');
-  const revokedAttempt = await request('GET', '/api/v1/apikeys', {
-    'X-API-Key': RAW_KEY
+  // Step 8: Verify revoked key no longer appears in active list
+  console.log('\n=== Step 8: Revoked key absent from list ===');
+  const postRevoke = await request('GET', '/api/v1/apikeys', {
+    Authorization: `Bearer ${TOKEN}`
   });
-  // Since apikeys routes use protect() (no allowApiKey), this should be 401
-  assert(revokedAttempt.status === 401, `Revoked → ${revokedAttempt.status} (expected 401)`);
+  assert(postRevoke.status === 200, `List after revoke → ${postRevoke.status} (expected 200)`);
+  const revokedStillListed = (postRevoke.data.data || []).some(
+    k => String(k._id) === String(KEY_ID)
+  );
+  assert(!revokedStillListed, `Revoked key absent from active list`);
 
   // Summary
   console.log(`\n${'='.repeat(40)}`);
