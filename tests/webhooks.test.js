@@ -10,8 +10,10 @@ const Webhook = require('../models/Webhook');
 
 const MONGO_URI = process.env.MONGO_URI_TEST;
 
+const RUN_ID = Date.now();
+
 const TEST_USER = {
-  email: 'webhooktest@spinx.dev',
+  email: `webhooktest+${RUN_ID}@spinx.dev`,
   password: 'Test@12345',
   name: 'Webhook Test',
 };

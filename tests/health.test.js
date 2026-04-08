@@ -36,14 +36,18 @@ describe('GET /api/health', () => {
 
 describe('GET /api/health/deep', () => {
   it('should return 200 and healthy status when DB is connected', async () => {
-    // Simulate server readiness
-    app.locals.isReady = true;
+    const original = app.locals.isReady;
+    try {
+      app.locals.isReady = true;
 
-    const res = await request(app).get('/api/health/deep');
-    expect(res.statusCode).toBe(200);
-    expect(res.body.status).toBe('healthy');
-    expect(res.body.checks).toHaveProperty('database', 'connected');
-    expect(res.body.checks).toHaveProperty('memory');
-    expect(res.body.checks).toHaveProperty('server');
+      const res = await request(app).get('/api/health/deep');
+      expect(res.statusCode).toBe(200);
+      expect(res.body.status).toBe('healthy');
+      expect(res.body.checks).toHaveProperty('database', 'connected');
+      expect(res.body.checks).toHaveProperty('memory');
+      expect(res.body.checks).toHaveProperty('server');
+    } finally {
+      app.locals.isReady = original;
+    }
   });
 });
