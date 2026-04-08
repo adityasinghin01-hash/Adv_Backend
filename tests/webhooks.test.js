@@ -8,7 +8,7 @@ const app = require('../app');
 const User = require('../models/User');
 const Webhook = require('../models/Webhook');
 
-const MONGO_URI = process.env.MONGO_URI_TEST || process.env.MONGO_URI;
+const MONGO_URI = process.env.MONGO_URI_TEST;
 
 const TEST_USER = {
   email: 'webhooktest@spinx.dev',
@@ -21,6 +21,9 @@ let userId;
 let webhookId;
 
 beforeAll(async () => {
+  if (!MONGO_URI) {
+    throw new Error('MONGO_URI_TEST env var is required for tests');
+  }
   if (mongoose.connection.readyState === 0) {
     await mongoose.connect(MONGO_URI);
   }
@@ -39,11 +42,14 @@ beforeAll(async () => {
   userId = user._id;
 
   // Login to get a JWT token
-  const res = await request(app)
+  const loginRes = await request(app)
     .post('/api/v1/login')
     .send({ email: TEST_USER.email, password: TEST_USER.password });
 
-  token = res.body.accessToken;
+  expect(loginRes.status).toBe(200);
+  expect(loginRes.body.accessToken).toBeDefined();
+  expect(typeof loginRes.body.accessToken).toBe('string');
+  token = loginRes.body.accessToken;
 });
 
 afterAll(async () => {
@@ -94,8 +100,7 @@ describe('POST /api/v1/webhooks', () => {
         events: ['totally.fake.event'],
       });
 
-    // The route validation passes string check, but Webhook model rejects unknown events
-    expect([400, 500]).toContain(res.statusCode);
+    expect(res.statusCode).toBe(400);
   });
 });
 

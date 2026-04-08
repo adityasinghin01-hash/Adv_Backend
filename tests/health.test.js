@@ -5,9 +5,12 @@ const request = require('supertest');
 const mongoose = require('mongoose');
 const app = require('../app');
 
-const MONGO_URI = process.env.MONGO_URI_TEST || process.env.MONGO_URI;
+const MONGO_URI = process.env.MONGO_URI_TEST;
 
 beforeAll(async () => {
+  if (!MONGO_URI) {
+    throw new Error('MONGO_URI_TEST env var is required for tests');
+  }
   if (mongoose.connection.readyState === 0) {
     await mongoose.connect(MONGO_URI);
   }

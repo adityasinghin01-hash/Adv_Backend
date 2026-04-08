@@ -9,10 +9,14 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
+    if: >-
+      github.event_name != 'pull_request' ||
+      github.event.pull_request.head.repo.full_name == github.repository
 
     env:
       NODE_ENV: test
       MONGO_URI: ${{ secrets.MONGO_URI }}
+      MONGO_URI_TEST: ${{ secrets.MONGO_URI_TEST }}
       JWT_SECRET: ${{ secrets.JWT_SECRET }}
       JWT_REFRESH_SECRET: ${{ secrets.JWT_REFRESH_SECRET }}
       WEBHOOK_SECRET_KEY: ${{ secrets.WEBHOOK_SECRET_KEY }}
