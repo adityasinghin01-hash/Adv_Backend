@@ -88,6 +88,33 @@ async function requestWithRetry(method, path, headers = {}, body = null, retries
   const qsKey = await requestWithRetry('GET', '/api/v1/profile?apiKey=sk_live_fake');
   assert(qsKey.status === 401, `Query key → ${qsKey.status} (expected 401)`);
 
+  // Step 4a: Cleanup existing keys
+  console.log('\n=== Step 4a: Cleanup existing keys ===');
+  try {
+    const existing = await requestWithRetry('GET', '/api/v1/apikeys', {
+      Authorization: `Bearer ${TOKEN}`
+    });
+    if (existing.status === 200 && Array.isArray(existing?.data?.data)) {
+      for (const k of existing.data.data) {
+        const id = k._id || k.id;
+        const del = await requestWithRetry('DELETE', `/api/v1/apikeys/${id}`, {
+          Authorization: `Bearer ${TOKEN}`
+        });
+        if (del.status === 200) {
+          console.log(`  🧹 Deleted existing key: ${id}`);
+        } else {
+          console.log(`  ⚠️  Failed to delete key ${id} → ${del.status}`);
+        }
+      }
+    } else if (existing.status === 200) {
+      console.log('  ℹ️  No existing keys to clean up');
+    } else {
+      console.log(`  ⚠️  Could not list keys for cleanup → ${existing.status}`);
+    }
+  } catch (err) {
+    console.log(`  ⚠️  Cleanup error (continuing): ${err.message}`);
+  }
+
   // Step 4: Create API key
   console.log('\n=== Step 4: Create API key ===');
   const create = await requestWithRetry('POST', '/api/v1/apikeys', {
@@ -107,7 +134,7 @@ async function requestWithRetry(method, path, headers = {}, body = null, retries
 
   assert(create.data.data.key.expiresAt !== undefined, 'Response includes expiresAt');
   const RAW_KEY = create.data.data.rawKey;
-  const KEY_ID = create.data.data.id;
+  const KEY_ID = create.data.data.key.id;
   assert(typeof RAW_KEY === 'string' && RAW_KEY.length > 0, `RAW_KEY invalid`);
   assert(typeof KEY_ID === 'string' && KEY_ID.length > 0, `KEY_ID invalid`);
   console.log(`  Key: (redacted)`);
