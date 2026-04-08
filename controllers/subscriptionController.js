@@ -6,6 +6,8 @@ const Subscription = require('../models/Subscription');
 const logger = require('../config/logger');
 const mongoose = require('mongoose');
 const User = require('../models/User');
+const { emit } = require('../services/webhookService');
+const { WEBHOOK_EVENTS } = require('../config/webhookEvents');
 
 /**
  * @route   GET /api/v1/subscriptions/plans
@@ -170,6 +172,31 @@ exports.changePlan = async (req, res, next) => {
                     limits: targetPlan.limits,
                 },
             },
+        });
+
+        // Emit webhook events AFTER response — never block the client
+        setImmediate(() => {
+            try {
+                const webhookPayload = {
+                    subscriptionId: newSub._id,
+                    previousPlan: currentSub.planId.name,
+                    newPlan: targetPlan.name,
+                    price: targetPlan.price,
+                };
+
+                if (isUpgrade) {
+                    emit(WEBHOOK_EVENTS.SUBSCRIPTION_UPGRADED, webhookPayload, req.user.id);
+                } else {
+                    emit(WEBHOOK_EVENTS.SUBSCRIPTION_CANCELLED, {
+                        subscriptionId: currentSub._id,
+                        plan: currentSub.planId.name,
+                        reason: 'downgrade',
+                    }, req.user.id);
+                    emit(WEBHOOK_EVENTS.SUBSCRIPTION_CREATED, webhookPayload, req.user.id);
+                }
+            } catch (err) {
+                logger.error('Webhook emit failed in changePlan', { error: err.message });
+            }
         });
     } catch (err) {
         logger.error('Error in changePlan:', err);

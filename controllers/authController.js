@@ -12,6 +12,8 @@ const validatePassword = require('../utils/passwordValidator');
 const { generateAccessToken, generateRefreshToken } = require('../services/tokenService');
 const { sendVerificationEmail } = require('../services/emailService');
 const { createDefaultFreeSubscription } = require('../services/subscriptionService');
+const { emit } = require('../services/webhookService');
+const { WEBHOOK_EVENTS } = require('../config/webhookEvents');
 
 const googleClient = new OAuth2Client(config.GOOGLE_CLIENT_ID);
 
@@ -100,6 +102,12 @@ const signup = async (req, res, next) => {
         });
 
         await newUser.save(); // Single save — fixes B-04
+
+        // Emit webhook for user created
+        emit(WEBHOOK_EVENTS.USER_CREATED, {
+            id: newUser._id,
+            role: newUser.role,
+        }, newUser._id);
 
         // Attempt durable subscription creation (blocks response slightly, but ensures consistency)
         try {
@@ -243,12 +251,15 @@ const googleLogin = async (req, res, next) => {
 
         let user = await User.findOne({ email });
 
+        let wasVerified = false;
+
         if (!user) {
             return res.status(404).json({
                 message: 'No account found with this Google email. Please sign up first.',
             });
         } else {
             // Update existing user with Google info
+            wasVerified = user.isVerified;
             user.name = name;
             user.picture = picture;
             user.isVerified = true;
@@ -264,6 +275,14 @@ const googleLogin = async (req, res, next) => {
         });
 
         await user.save();
+
+        if (!wasVerified) {
+            emit(WEBHOOK_EVENTS.USER_VERIFIED, {
+                id: user._id,
+                name: user.name,
+                role: user.role,
+            }, user._id);
+        }
 
         return res.status(200).json({
             success: true,

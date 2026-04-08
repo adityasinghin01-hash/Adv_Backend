@@ -8,6 +8,7 @@ const config = require('./config/config');
 const connectDB = require('./config/db');
 const logger = require('./config/logger');
 const { drainPendingUpdates } = require('./middleware/apiKeyMiddleware');
+const { startWebhookRetryWorker, stopWebhookRetryWorker } = require('./services/webhookService');
 
 // ── Readiness Flag ───────────────────────────────────────────
 // Set to true only after DB connects. Used by /api/health/deep.
@@ -22,6 +23,10 @@ const server = app.listen(config.PORT, '0.0.0.0', async () => {
     try {
         await connectDB();
         app.locals.isReady = true;
+
+        // Start background workers that depend on DB
+        startWebhookRetryWorker();
+
         logger.info('✅ Server is ready to accept requests');
     } catch (err) {
         logger.error('Failed to connect to MongoDB during startup', { error: err.message });
@@ -49,12 +54,17 @@ const gracefulShutdown = async (signal) => {
     // Mark as not ready — health check will return 503
     app.locals.isReady = false;
 
-    // Stop accepting new connections and drain existing ones
+    // 1. Stop the webhook retry worker — no new retries scheduled
+    stopWebhookRetryWorker();
+    // 2. Wait for in-flight dispatches to settle
+    await new Promise(resolve => setTimeout(resolve, 2000));
+
+    // 3. Stop accepting new HTTP connections and drain existing ones
     server.close(async () => {
         logger.info('HTTP server closed — all connections drained.');
 
         try {
-            // Flush any in-flight API key usage stat updates
+            // 4. Flush any in-flight API key usage stat updates
             await drainPendingUpdates();
             logger.info('API key pending updates flushed.');
         } catch (err) {
@@ -62,6 +72,7 @@ const gracefulShutdown = async (signal) => {
         }
 
         try {
+            // 5. Close MongoDB connection last
             await mongoose.connection.close(false);
             logger.info('MongoDB connection closed.');
         } catch (err) {

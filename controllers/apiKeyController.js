@@ -4,6 +4,8 @@
 const ApiKey = require('../models/ApiKey');
 const { createApiKey, rotateApiKey } = require('../services/apiKeyService');
 const logger = require('../config/logger');
+const { emit } = require('../services/webhookService');
+const { WEBHOOK_EVENTS } = require('../config/webhookEvents');
 
 /**
  * @desc    Create a new API Key
@@ -38,6 +40,14 @@ exports.createKey = async (req, res, next) => {
                 }
             }
         });
+
+        // Emit after response — non-blocking
+        emit(WEBHOOK_EVENTS.APIKEY_CREATED, {
+            keyId: apiKeyDoc._id,
+            name: apiKeyDoc.name,
+            keyPrefix: apiKeyDoc.keyPrefix,
+            scopes: apiKeyDoc.scopes,
+        }, req.user.id);
     } catch (error) {
         logger.error('Error creating API key:', error);
         next(error);
@@ -90,6 +100,13 @@ exports.revokeKey = async (req, res, next) => {
             success: true,
             message: 'API Key revoked successfully.'
         });
+
+        // Emit after response — non-blocking
+        emit(WEBHOOK_EVENTS.APIKEY_REVOKED, {
+            keyId: revoked._id,
+            name: revoked.name,
+            keyPrefix: revoked.keyPrefix,
+        }, req.user.id);
     } catch (error) {
         logger.error('Error revoking API key:', error);
         next(error);
@@ -124,6 +141,15 @@ exports.rotateKey = async (req, res, next) => {
                 }
             }
         });
+
+        // Emit after response — non-blocking
+        emit(WEBHOOK_EVENTS.APIKEY_ROTATED, {
+            previousKeyId: id,
+            newKeyId: newApiKeyDoc._id,
+            name: newApiKeyDoc.name,
+            keyPrefix: newApiKeyDoc.keyPrefix,
+            scopes: newApiKeyDoc.scopes,
+        }, req.user.id);
     } catch (error) {
         logger.error('Error rotating API key:', error);
         next(error);
