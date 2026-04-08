@@ -154,6 +154,13 @@ describe('PATCH /api/v1/webhooks/:id', () => {
 
     expect(res.statusCode).toBe(200);
     expect(res.body.success).toBe(true);
+
+    // Verify the update was actually persisted
+    const getRes = await request(app)
+      .get(`/api/v1/webhooks/${webhookId}`)
+      .set('Authorization', `Bearer ${token}`);
+    expect(getRes.statusCode).toBe(200);
+    expect(getRes.body.data.description).toBe('Updated description');
   });
 });
 
