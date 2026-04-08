@@ -154,26 +154,6 @@ exports.changePlan = async (req, res, next) => {
 
         logger.info(`User ${req.user.id} ${isUpgrade ? 'upgraded' : 'downgraded'} from '${currentSub.planId.name}' to '${targetPlan.name}'`);
 
-        // Emit webhook events for subscription changes
-        const webhookPayload = {
-            subscriptionId: newSub._id,
-            previousPlan: currentSub.planId.name,
-            newPlan: targetPlan.name,
-            price: targetPlan.price,
-        };
-
-        if (isUpgrade) {
-            emit(WEBHOOK_EVENTS.SUBSCRIPTION_UPGRADED, webhookPayload, req.user.id);
-        } else {
-            // Downgrade = cancelled old + created new at lower tier
-            emit(WEBHOOK_EVENTS.SUBSCRIPTION_CANCELLED, {
-                subscriptionId: currentSub._id,
-                plan: currentSub.planId.name,
-                reason: 'downgrade',
-            }, req.user.id);
-            emit(WEBHOOK_EVENTS.SUBSCRIPTION_CREATED, webhookPayload, req.user.id);
-        }
-
         res.status(200).json({
             success: true,
             message: `Plan ${isUpgrade ? 'upgraded' : 'downgraded'} to ${targetPlan.displayName}.`,
@@ -192,6 +172,31 @@ exports.changePlan = async (req, res, next) => {
                     limits: targetPlan.limits,
                 },
             },
+        });
+
+        // Emit webhook events AFTER response — never block the client
+        setImmediate(() => {
+            try {
+                const webhookPayload = {
+                    subscriptionId: newSub._id,
+                    previousPlan: currentSub.planId.name,
+                    newPlan: targetPlan.name,
+                    price: targetPlan.price,
+                };
+
+                if (isUpgrade) {
+                    emit(WEBHOOK_EVENTS.SUBSCRIPTION_UPGRADED, webhookPayload, req.user.id);
+                } else {
+                    emit(WEBHOOK_EVENTS.SUBSCRIPTION_CANCELLED, {
+                        subscriptionId: currentSub._id,
+                        plan: currentSub.planId.name,
+                        reason: 'downgrade',
+                    }, req.user.id);
+                    emit(WEBHOOK_EVENTS.SUBSCRIPTION_CREATED, webhookPayload, req.user.id);
+                }
+            } catch (err) {
+                logger.error('Webhook emit failed in changePlan', { error: err.message });
+            }
         });
     } catch (err) {
         logger.error('Error in changePlan:', err);

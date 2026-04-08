@@ -47,9 +47,28 @@ const encryptSecret = (rawSecret) => {
 
 /**
  * Decrypt an AES-256-GCM encrypted secret back to its raw form.
+ * Validates input format before attempting decryption.
  */
 const decryptSecret = (encryptedSecret) => {
-  const [ivHex, authTagHex, ciphertext] = encryptedSecret.split(':');
+  if (!encryptedSecret || typeof encryptedSecret !== 'string') {
+    throw new Error('decryptSecret: encryptedSecret must be a non-empty string');
+  }
+  const parts = encryptedSecret.split(':');
+  if (parts.length !== 3) {
+    throw new Error('decryptSecret: malformed encryptedSecret — expected iv:authTag:ciphertext');
+  }
+  const [ivHex, authTagHex, ciphertext] = parts;
+  const hexPattern = /^[0-9a-f]+$/i;
+  if (!ivHex || ivHex.length % 2 !== 0 || !hexPattern.test(ivHex)) {
+    throw new Error('decryptSecret: invalid IV — must be even-length hex');
+  }
+  if (!authTagHex || authTagHex.length % 2 !== 0 || !hexPattern.test(authTagHex)) {
+    throw new Error('decryptSecret: invalid authTag — must be even-length hex');
+  }
+  if (!ciphertext || ciphertext.length % 2 !== 0 || !hexPattern.test(ciphertext)) {
+    throw new Error('decryptSecret: invalid ciphertext — must be even-length hex');
+  }
+
   const decipher = crypto.createDecipheriv(
     'aes-256-gcm',
     ENCRYPTION_KEY,
@@ -141,11 +160,12 @@ const dispatchWithRetry = async (webhook, event, payload, attempt = 1) => {
 
   return new Promise((resolve) => {
     const req = https.request(options, (res) => {
-      let chunks = '';
-      res.on('data', (d) => (chunks += d));
+      const chunks = [];
+      res.on('data', (d) => chunks.push(d));
       res.on('end', async () => {
+        const bodyStr = Buffer.concat(chunks).toString('utf8');
         const isSuccess = res.statusCode >= 200 && res.statusCode < 300;
-        const truncatedBody = chunks.slice(0, 1000);
+        const truncatedBody = bodyStr.slice(0, 1000);
 
         try {
           await WebhookDelivery.create({
@@ -285,19 +305,25 @@ let retryWorkerTimer = null;
 
 const processRetryQueue = async () => {
   try {
-    const pendingRetries = await WebhookDelivery.find({
-      success: false,
-      nextRetryAt: { $lte: new Date() },
-    }).limit(50); // batch size cap
+    // Atomic claim loop — avoids TOCTOU race by matching AND clearing nextRetryAt in one operation
+    const deliveries = [];
+    // eslint-disable-next-line no-constant-condition
+    while (true) {
+      const delivery = await WebhookDelivery.findOneAndUpdate(
+        { success: false, nextRetryAt: { $lte: new Date() } },
+        { $unset: { nextRetryAt: 1 } },
+        { returnDocument: 'after' }
+      );
+      if (!delivery) break;
+      deliveries.push(delivery);
+      if (deliveries.length >= 50) break; // batch size cap
+    }
 
-    if (pendingRetries.length === 0) return;
+    if (deliveries.length === 0) return;
 
-    logger.info(`Webhook retry worker found ${pendingRetries.length} pending retries`);
+    logger.info(`Webhook retry worker found ${deliveries.length} pending retries`);
 
-    for (const delivery of pendingRetries) {
-      // Clear nextRetryAt immediately to prevent duplicate pickup
-      await WebhookDelivery.findByIdAndUpdate(delivery._id, { $unset: { nextRetryAt: 1 } });
-
+    for (const delivery of deliveries) {
       const webhook = await Webhook.findById(delivery.webhookId);
       if (!webhook || !webhook.isActive) {
         logger.info('Skipping retry — webhook inactive or deleted', {
@@ -307,7 +333,14 @@ const processRetryQueue = async () => {
       }
 
       const nextAttempt = delivery.attempt + 1;
-      if (nextAttempt > MAX_ATTEMPTS) continue;
+      if (nextAttempt > MAX_ATTEMPTS) {
+        logger.warn('Skipping retry — delivery exhausted all attempts', {
+          deliveryId: delivery._id,
+          currentAttempt: delivery.attempt,
+          maxAttempts: MAX_ATTEMPTS,
+        });
+        continue;
+      }
 
       dispatchWithRetry(webhook, delivery.event, delivery.payload, nextAttempt).catch((err) => {
         logger.error('Retry worker dispatch error', {
@@ -336,6 +369,17 @@ const startWebhookRetryWorker = () => {
   });
 };
 
+/**
+ * Stop the background retry worker. Call during graceful shutdown.
+ */
+const stopWebhookRetryWorker = () => {
+  if (retryWorkerTimer) {
+    clearInterval(retryWorkerTimer);
+    retryWorkerTimer = null;
+    logger.info('🛑 Webhook retry worker stopped');
+  }
+};
+
 module.exports = {
   emit,
   dispatchWithRetry,
@@ -343,5 +387,5 @@ module.exports = {
   encryptSecret,
   decryptSecret,
   startWebhookRetryWorker,
+  stopWebhookRetryWorker,
 };
-

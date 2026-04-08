@@ -106,7 +106,6 @@ const signup = async (req, res, next) => {
         // Emit webhook for user created
         emit(WEBHOOK_EVENTS.USER_CREATED, {
             id: newUser._id,
-            email: newUser.email,
             role: newUser.role,
         }, newUser._id);
 
@@ -280,7 +279,6 @@ const googleLogin = async (req, res, next) => {
         if (!wasVerified) {
             emit(WEBHOOK_EVENTS.USER_VERIFIED, {
                 id: user._id,
-                email: user.email,
                 name: user.name,
                 role: user.role,
             }, user._id);

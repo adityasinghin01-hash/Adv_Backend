@@ -2,6 +2,7 @@
 // Stores registered webhook endpoints. Secrets are stored as AES-256-GCM encrypted — never in plaintext.
 
 const mongoose = require('mongoose');
+const validatorLib = require('validator');
 const { VALID_EVENTS } = require('../config/webhookEvents');
 
 const webhookSchema = new mongoose.Schema(
@@ -15,8 +16,12 @@ const webhookSchema = new mongoose.Schema(
       type: String,
       required: [true, 'Webhook URL is required.'],
       validate: {
-        validator: (v) => /^https:\/\/.+/.test(v),
-        message: 'Webhook URL must use HTTPS.',
+        validator: (v) => validatorLib.isURL(v, {
+          protocols: ['https'],
+          require_protocol: true,
+          require_tld: true,
+        }),
+        message: 'Webhook URL must be a valid HTTPS URL with a domain.',
       },
     },
     events: {

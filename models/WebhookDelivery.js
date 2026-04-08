@@ -66,8 +66,8 @@ webhookDeliverySchema.index({ webhookId: 1, deliveredAt: -1 });
 // Dashboard stats — successful vs failed deliveries per user
 webhookDeliverySchema.index({ userId: 1, success: 1 });
 
-// Retry scheduler — find deliveries due for retry
-webhookDeliverySchema.index({ nextRetryAt: 1 });
+// Retry worker — matches query { success: false, nextRetryAt: { $lte: now } }
+webhookDeliverySchema.index({ success: 1, nextRetryAt: 1 });
 
 const WebhookDelivery = mongoose.model('WebhookDelivery', webhookDeliverySchema);
 

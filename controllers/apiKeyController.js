@@ -141,6 +141,21 @@ exports.rotateKey = async (req, res, next) => {
                 }
             }
         });
+
+        // Emit after response — non-blocking
+        setImmediate(() => {
+            try {
+                emit(WEBHOOK_EVENTS.APIKEY_ROTATED, {
+                    previousKeyId: id,
+                    newKeyId: newApiKeyDoc._id,
+                    name: newApiKeyDoc.name,
+                    keyPrefix: newApiKeyDoc.keyPrefix,
+                    scopes: newApiKeyDoc.scopes,
+                }, req.user.id);
+            } catch (err) {
+                logger.error('Webhook emit failed in rotateKey', { error: err.message });
+            }
+        });
     } catch (error) {
         logger.error('Error rotating API key:', error);
         next(error);

@@ -8,7 +8,7 @@ const config = require('./config/config');
 const connectDB = require('./config/db');
 const logger = require('./config/logger');
 const { drainPendingUpdates } = require('./middleware/apiKeyMiddleware');
-const { startWebhookRetryWorker } = require('./services/webhookService');
+const { startWebhookRetryWorker, stopWebhookRetryWorker } = require('./services/webhookService');
 
 // ── Readiness Flag ───────────────────────────────────────────
 // Set to true only after DB connects. Used by /api/health/deep.
@@ -57,6 +57,9 @@ const gracefulShutdown = async (signal) => {
     // Stop accepting new connections and drain existing ones
     server.close(async () => {
         logger.info('HTTP server closed — all connections drained.');
+
+        // Stop the webhook retry worker before closing DB
+        stopWebhookRetryWorker();
 
         try {
             // Flush any in-flight API key usage stat updates

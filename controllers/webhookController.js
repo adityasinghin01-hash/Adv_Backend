@@ -94,6 +94,11 @@ exports.listWebhooks = async (req, res, next) => {
  */
 exports.getWebhook = async (req, res, next) => {
   try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ success: false, message: errors.array()[0].msg });
+    }
+
     const webhook = await Webhook.findOne({
       _id: req.params.id,
       userId: req.user.id,
@@ -172,6 +177,11 @@ exports.updateWebhook = async (req, res, next) => {
  */
 exports.deleteWebhook = async (req, res, next) => {
   try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ success: false, message: errors.array()[0].msg });
+    }
+
     const webhook = await Webhook.findOneAndDelete({
       _id: req.params.id,
       userId: req.user.id,
@@ -181,7 +191,14 @@ exports.deleteWebhook = async (req, res, next) => {
       return res.status(404).json({ success: false, message: 'Webhook not found.' });
     }
 
-    logger.info('Webhook deleted', { webhookId: webhook._id, userId: req.user.id });
+    // Clean up orphaned delivery records
+    const { deletedCount } = await WebhookDelivery.deleteMany({ webhookId: webhook._id });
+
+    logger.info('Webhook deleted', {
+      webhookId: webhook._id,
+      userId: req.user.id,
+      deliveriesDeleted: deletedCount,
+    });
 
     res.status(200).json({ success: true, message: 'Webhook deleted successfully.' });
   } catch (error) {
@@ -197,6 +214,11 @@ exports.deleteWebhook = async (req, res, next) => {
  */
 exports.getDeliveryHistory = async (req, res, next) => {
   try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ success: false, message: errors.array()[0].msg });
+    }
+
     // Ownership check
     const webhook = await Webhook.findOne({
       _id: req.params.id,
@@ -241,6 +263,11 @@ exports.getDeliveryHistory = async (req, res, next) => {
  */
 exports.testWebhook = async (req, res, next) => {
   try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ success: false, message: errors.array()[0].msg });
+    }
+
     const webhook = await Webhook.findOne({
       _id: req.params.id,
       userId: req.user.id,

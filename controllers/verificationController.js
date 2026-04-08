@@ -64,7 +64,6 @@ const verifyEmail = async (req, res, next) => {
 
         emit(WEBHOOK_EVENTS.USER_VERIFIED, {
             id: user._id,
-            email: user.email,
             name: user.name,
             role: user.role,
         }, user._id);
