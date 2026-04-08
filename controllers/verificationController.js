@@ -10,6 +10,8 @@ const config = require('../config/config');
 const hashToken = require('../utils/hashToken');
 const { sendVerificationEmail } = require('../services/emailService');
 const { generateAccessToken, generateRefreshToken } = require('../services/tokenService');
+const { emit } = require('../services/webhookService');
+const { WEBHOOK_EVENTS } = require('../config/webhookEvents');
 
 const VERIFICATION_TOKEN_EXPIRY = 24 * 60 * 60 * 1000; // 24 hours
 
@@ -59,6 +61,13 @@ const verifyEmail = async (req, res, next) => {
         user.verificationTokenExpiry = undefined;
 
         await user.save();
+
+        emit(WEBHOOK_EVENTS.USER_VERIFIED, {
+            id: user._id,
+            email: user.email,
+            name: user.name,
+            role: user.role,
+        }, user._id);
 
         const source = req.query.source || 'app';
         const clientUrl = process.env.CLIENT_URL || 'https://backend-z6cy.onrender.com';

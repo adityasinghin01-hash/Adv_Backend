@@ -1,5 +1,5 @@
 // models/Webhook.js
-// Stores registered webhook endpoints. Secrets are stored as HMAC hashes — never in plaintext.
+// Stores registered webhook endpoints. Secrets are stored as AES-256-GCM encrypted — never in plaintext.
 
 const mongoose = require('mongoose');
 const { VALID_EVENTS } = require('../config/webhookEvents');
@@ -10,7 +10,6 @@ const webhookSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User',
       required: true,
-      index: true,
     },
     url: {
       type: String,
@@ -28,7 +27,7 @@ const webhookSchema = new mongoose.Schema(
         message: 'Events array must contain at least one event.',
       },
     },
-    secret: {
+    encryptedSecret: {
       type: String,
       required: [true, 'Webhook secret is required.'],
     },
@@ -47,13 +46,35 @@ const webhookSchema = new mongoose.Schema(
   }
 );
 
+// Shared event validation helper
+const validateEvents = (events) => {
+  const invalidEvents = events.filter((e) => !VALID_EVENTS.has(e));
+  if (invalidEvents.length > 0) {
+    const err = new Error(`Invalid webhook event(s): ${invalidEvents.join(', ')}`);
+    err.name = 'ValidationError';
+    throw err;
+  }
+};
+
 // Pre-save hook: validate every event against the canonical VALID_EVENTS set
 webhookSchema.pre('save', async function () {
-  const invalidEvents = this.events.filter((e) => !VALID_EVENTS.has(e));
-  if (invalidEvents.length > 0) {
-    const err = new mongoose.Error.ValidationError(this);
-    err.message = `Invalid webhook event(s): ${invalidEvents.join(', ')}`;
-    throw err;
+  validateEvents(this.events);
+});
+
+// Pre-update hooks: validate events when updating via findOneAndUpdate or updateOne
+webhookSchema.pre('findOneAndUpdate', function () {
+  const update = this.getUpdate();
+  const events = update?.events || update?.$set?.events;
+  if (events) {
+    validateEvents(events);
+  }
+});
+
+webhookSchema.pre('updateOne', function () {
+  const update = this.getUpdate();
+  const events = update?.events || update?.$set?.events;
+  if (events) {
+    validateEvents(events);
   }
 });
 

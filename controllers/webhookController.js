@@ -5,7 +5,7 @@ const { validationResult } = require('express-validator');
 const Webhook = require('../models/Webhook');
 const WebhookDelivery = require('../models/WebhookDelivery');
 const { VALID_EVENTS } = require('../config/webhookEvents');
-const { generateSecret, hashSecret, emit } = require('../services/webhookService');
+const { generateSecret, encryptSecret, emit, dispatchWithRetry } = require('../services/webhookService');
 const logger = require('../config/logger');
 
 /**
@@ -32,13 +32,13 @@ exports.createWebhook = async (req, res, next) => {
     }
 
     const rawSecret = generateSecret();
-    const hashedSecret = hashSecret(rawSecret);
+    const encrypted = encryptSecret(rawSecret);
 
     const webhook = await Webhook.create({
       userId: req.user.id,
       url,
       events,
-      secret: hashedSecret,
+      encryptedSecret: encrypted,
       description: description || '',
     });
 
@@ -73,7 +73,7 @@ exports.createWebhook = async (req, res, next) => {
 exports.listWebhooks = async (req, res, next) => {
   try {
     const webhooks = await Webhook.find({ userId: req.user.id })
-      .select('-secret -__v')
+      .select('-encryptedSecret -__v')
       .sort({ createdAt: -1 });
 
     res.status(200).json({
@@ -97,7 +97,7 @@ exports.getWebhook = async (req, res, next) => {
     const webhook = await Webhook.findOne({
       _id: req.params.id,
       userId: req.user.id,
-    }).select('-secret -__v');
+    }).select('-encryptedSecret -__v');
 
     if (!webhook) {
       return res.status(404).json({ success: false, message: 'Webhook not found.' });
@@ -153,9 +153,9 @@ exports.updateWebhook = async (req, res, next) => {
 
     logger.info('Webhook updated', { webhookId: webhook._id, userId: req.user.id });
 
-    // Strip secret before responding
+    // Strip encryptedSecret before responding
     const response = webhook.toObject();
-    delete response.secret;
+    delete response.encryptedSecret;
     delete response.__v;
 
     res.status(200).json({ success: true, data: response });
@@ -251,8 +251,10 @@ exports.testWebhook = async (req, res, next) => {
       return res.status(404).json({ success: false, message: 'Webhook not found or inactive.' });
     }
 
-    // Fire and forget — emit returns immediately
-    emit('webhook.test', { message: 'Test delivery from Adv_Backend' }, req.user.id);
+    // Dispatch directly to this specific webhook — not via emit() which broadcasts to ALL user webhooks
+    dispatchWithRetry(webhook, 'webhook.test', { message: 'Test delivery from Adv_Backend' }).catch((err) => {
+      logger.error('Test webhook dispatch error', { webhookId: webhook._id, error: err.message });
+    });
 
     logger.info('Webhook test triggered', { webhookId: webhook._id, userId: req.user.id });
 

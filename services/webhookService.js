@@ -13,6 +13,18 @@ const DISPATCH_TIMEOUT = 10000; // 10 seconds
 const MAX_ATTEMPTS = 4;
 const RETRY_DELAYS = [30000, 60000, 300000]; // 30s, 60s, 5min
 
+// ── Encryption Key ───────────────────────────────────────
+// AES-256-GCM requires a 32-byte key (64 hex chars).
+// Fail fast at startup if not set — webhook signing cannot work without it.
+const ENCRYPTION_KEY_HEX = process.env.WEBHOOK_SECRET_KEY;
+if (!ENCRYPTION_KEY_HEX || ENCRYPTION_KEY_HEX.length !== 64) {
+  throw new Error(
+    'WEBHOOK_SECRET_KEY must be set to a 64-character hex string (32 bytes). ' +
+    'Generate with: node -e "console.log(require(\'crypto\').randomBytes(32).toString(\'hex\'))"'
+  );
+}
+const ENCRYPTION_KEY = Buffer.from(ENCRYPTION_KEY_HEX, 'hex');
+
 // ── Helpers ──────────────────────────────────────────────
 
 /**
@@ -21,10 +33,33 @@ const RETRY_DELAYS = [30000, 60000, 300000]; // 30s, 60s, 5min
 const generateSecret = () => crypto.randomBytes(32).toString('hex');
 
 /**
- * Hash a raw secret with SHA-256 for secure storage.
+ * Encrypt a raw secret with AES-256-GCM for reversible storage.
+ * Returns: iv:authTag:ciphertext (all hex, colon-separated).
  */
-const hashSecret = (rawSecret) =>
-  crypto.createHash('sha256').update(rawSecret).digest('hex');
+const encryptSecret = (rawSecret) => {
+  const iv = crypto.randomBytes(12); // 96-bit IV recommended for GCM
+  const cipher = crypto.createCipheriv('aes-256-gcm', ENCRYPTION_KEY, iv);
+  let encrypted = cipher.update(rawSecret, 'utf8', 'hex');
+  encrypted += cipher.final('hex');
+  const authTag = cipher.getAuthTag().toString('hex');
+  return `${iv.toString('hex')}:${authTag}:${encrypted}`;
+};
+
+/**
+ * Decrypt an AES-256-GCM encrypted secret back to its raw form.
+ */
+const decryptSecret = (encryptedSecret) => {
+  const [ivHex, authTagHex, ciphertext] = encryptedSecret.split(':');
+  const decipher = crypto.createDecipheriv(
+    'aes-256-gcm',
+    ENCRYPTION_KEY,
+    Buffer.from(ivHex, 'hex')
+  );
+  decipher.setAuthTag(Buffer.from(authTagHex, 'hex'));
+  let decrypted = decipher.update(ciphertext, 'hex', 'utf8');
+  decrypted += decipher.final('utf8');
+  return decrypted;
+};
 
 // ── Core ─────────────────────────────────────────────────
 
@@ -81,9 +116,10 @@ const dispatchWithRetry = async (webhook, event, payload, attempt = 1) => {
     data: payload,
   });
 
-  // HMAC-SHA256 signature using the stored hashed secret
+  // Decrypt the stored secret to compute HMAC-SHA256 signature
+  const rawSecret = decryptSecret(webhook.encryptedSecret);
   const signature = crypto
-    .createHmac('sha256', webhook.secret)
+    .createHmac('sha256', rawSecret)
     .update(body)
     .digest('hex');
 
@@ -122,6 +158,9 @@ const dispatchWithRetry = async (webhook, event, payload, attempt = 1) => {
             attempt,
             success: isSuccess,
             deliveredAt: new Date(),
+            nextRetryAt: !isSuccess && attempt < MAX_ATTEMPTS
+              ? new Date(Date.now() + (RETRY_DELAYS[attempt - 1] || RETRY_DELAYS[RETRY_DELAYS.length - 1]))
+              : undefined,
           });
         } catch (dbErr) {
           logger.error('Failed to save WebhookDelivery', { error: dbErr.message });
@@ -164,6 +203,9 @@ const dispatchWithRetry = async (webhook, event, payload, attempt = 1) => {
           attempt,
           success: false,
           deliveredAt: new Date(),
+          nextRetryAt: attempt < MAX_ATTEMPTS
+            ? new Date(Date.now() + (RETRY_DELAYS[attempt - 1] || RETRY_DELAYS[RETRY_DELAYS.length - 1]))
+            : undefined,
         });
       } catch (dbErr) {
         logger.error('Failed to save WebhookDelivery', { error: dbErr.message });
@@ -187,8 +229,9 @@ const dispatchWithRetry = async (webhook, event, payload, attempt = 1) => {
 
 /**
  * Schedule a retry via setTimeout if attempts remain.
+ * Also persists nextRetryAt to the delivery record for durability across restarts.
  */
-const scheduleRetry = (webhook, event, payload, currentAttempt) => {
+const scheduleRetry = async (webhook, event, payload, currentAttempt) => {
   if (currentAttempt >= MAX_ATTEMPTS) {
     logger.error('Webhook delivery exhausted all retries', {
       webhookId: webhook._id,
@@ -201,6 +244,17 @@ const scheduleRetry = (webhook, event, payload, currentAttempt) => {
   const delay = RETRY_DELAYS[currentAttempt - 1] || RETRY_DELAYS[RETRY_DELAYS.length - 1];
   const nextAttempt = currentAttempt + 1;
   const nextRetryAt = new Date(Date.now() + delay);
+
+  // Persist nextRetryAt on the latest failed delivery so the retry worker can find it
+  try {
+    await WebhookDelivery.findOneAndUpdate(
+      { webhookId: webhook._id, event, attempt: currentAttempt, success: false },
+      { $set: { nextRetryAt } },
+      { sort: { deliveredAt: -1 } }
+    );
+  } catch (dbErr) {
+    logger.error('Failed to persist nextRetryAt', { error: dbErr.message });
+  }
 
   logger.info('Webhook retry scheduled', {
     webhookId: webhook._id,
@@ -222,9 +276,72 @@ const scheduleRetry = (webhook, event, payload, currentAttempt) => {
   }, delay);
 };
 
+// ── Persistent Retry Worker ──────────────────────────────
+// Polls every 60s for failed deliveries with a past nextRetryAt.
+// Covers retries missed due to process restarts (setTimeout is in-memory only).
+
+const RETRY_POLL_INTERVAL = 60000; // 60 seconds
+let retryWorkerTimer = null;
+
+const processRetryQueue = async () => {
+  try {
+    const pendingRetries = await WebhookDelivery.find({
+      success: false,
+      nextRetryAt: { $lte: new Date() },
+    }).limit(50); // batch size cap
+
+    if (pendingRetries.length === 0) return;
+
+    logger.info(`Webhook retry worker found ${pendingRetries.length} pending retries`);
+
+    for (const delivery of pendingRetries) {
+      // Clear nextRetryAt immediately to prevent duplicate pickup
+      await WebhookDelivery.findByIdAndUpdate(delivery._id, { $unset: { nextRetryAt: 1 } });
+
+      const webhook = await Webhook.findById(delivery.webhookId);
+      if (!webhook || !webhook.isActive) {
+        logger.info('Skipping retry — webhook inactive or deleted', {
+          webhookId: delivery.webhookId,
+        });
+        continue;
+      }
+
+      const nextAttempt = delivery.attempt + 1;
+      if (nextAttempt > MAX_ATTEMPTS) continue;
+
+      dispatchWithRetry(webhook, delivery.event, delivery.payload, nextAttempt).catch((err) => {
+        logger.error('Retry worker dispatch error', {
+          webhookId: webhook._id,
+          event: delivery.event,
+          attempt: nextAttempt,
+          error: err.message,
+        });
+      });
+    }
+  } catch (err) {
+    logger.error('Webhook retry worker error', { error: err.message });
+  }
+};
+
+/**
+ * Start the background retry worker. Call once from server.js after DB connects.
+ */
+const startWebhookRetryWorker = () => {
+  if (retryWorkerTimer) return; // idempotent
+  logger.info('🔁 Webhook retry worker started (polling every 60s)');
+  retryWorkerTimer = setInterval(processRetryQueue, RETRY_POLL_INTERVAL);
+  // Run once immediately to pick up anything pending from before restart
+  processRetryQueue().catch((err) => {
+    logger.error('Webhook retry worker initial run failed', { error: err.message });
+  });
+};
+
 module.exports = {
   emit,
   dispatchWithRetry,
   generateSecret,
-  hashSecret,
+  encryptSecret,
+  decryptSecret,
+  startWebhookRetryWorker,
 };
+

@@ -9,13 +9,11 @@ const webhookDeliverySchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Webhook',
       required: true,
-      index: true,
     },
     userId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User',
       required: true,
-      index: true,
     },
     event: {
       type: String,

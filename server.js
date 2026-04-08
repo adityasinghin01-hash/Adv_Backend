@@ -8,6 +8,7 @@ const config = require('./config/config');
 const connectDB = require('./config/db');
 const logger = require('./config/logger');
 const { drainPendingUpdates } = require('./middleware/apiKeyMiddleware');
+const { startWebhookRetryWorker } = require('./services/webhookService');
 
 // ── Readiness Flag ───────────────────────────────────────────
 // Set to true only after DB connects. Used by /api/health/deep.
@@ -22,6 +23,10 @@ const server = app.listen(config.PORT, '0.0.0.0', async () => {
     try {
         await connectDB();
         app.locals.isReady = true;
+
+        // Start background workers that depend on DB
+        startWebhookRetryWorker();
+
         logger.info('✅ Server is ready to accept requests');
     } catch (err) {
         logger.error('Failed to connect to MongoDB during startup', { error: err.message });

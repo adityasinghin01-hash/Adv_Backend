@@ -6,6 +6,8 @@ const Subscription = require('../models/Subscription');
 const logger = require('../config/logger');
 const mongoose = require('mongoose');
 const User = require('../models/User');
+const { emit } = require('../services/webhookService');
+const { WEBHOOK_EVENTS } = require('../config/webhookEvents');
 
 /**
  * @route   GET /api/v1/subscriptions/plans
@@ -151,6 +153,26 @@ exports.changePlan = async (req, res, next) => {
         }
 
         logger.info(`User ${req.user.id} ${isUpgrade ? 'upgraded' : 'downgraded'} from '${currentSub.planId.name}' to '${targetPlan.name}'`);
+
+        // Emit webhook events for subscription changes
+        const webhookPayload = {
+            subscriptionId: newSub._id,
+            previousPlan: currentSub.planId.name,
+            newPlan: targetPlan.name,
+            price: targetPlan.price,
+        };
+
+        if (isUpgrade) {
+            emit(WEBHOOK_EVENTS.SUBSCRIPTION_UPGRADED, webhookPayload, req.user.id);
+        } else {
+            // Downgrade = cancelled old + created new at lower tier
+            emit(WEBHOOK_EVENTS.SUBSCRIPTION_CANCELLED, {
+                subscriptionId: currentSub._id,
+                plan: currentSub.planId.name,
+                reason: 'downgrade',
+            }, req.user.id);
+            emit(WEBHOOK_EVENTS.SUBSCRIPTION_CREATED, webhookPayload, req.user.id);
+        }
 
         res.status(200).json({
             success: true,

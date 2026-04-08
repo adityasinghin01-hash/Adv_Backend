@@ -21,7 +21,8 @@ const createValidation = [
   body('url')
     .notEmpty().withMessage('URL is required.')
     .isString().withMessage('URL must be a string.')
-    .matches(/^https:\/\//).withMessage('Webhook URL must start with https://.'),
+    .isURL({ protocols: ['https'], require_protocol: true, require_tld: true })
+    .withMessage('Webhook URL must be a valid HTTPS URL with a domain.'),
   body('events')
     .isArray({ min: 1 }).withMessage('Events must be an array with at least one event.'),
   body('events.*')
@@ -36,7 +37,8 @@ const updateValidation = [
   body('url')
     .optional()
     .isString().withMessage('URL must be a string.')
-    .matches(/^https:\/\//).withMessage('Webhook URL must start with https://.'),
+    .isURL({ protocols: ['https'], require_protocol: true, require_tld: true })
+    .withMessage('Webhook URL must be a valid HTTPS URL with a domain.'),
   body('events')
     .optional()
     .isArray({ min: 1 }).withMessage('Events must be an array with at least one event.'),
