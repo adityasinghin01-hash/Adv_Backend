@@ -31,6 +31,9 @@ const config = {
     ACCESS_TOKEN_EXPIRES: process.env.ACCESS_TOKEN_EXPIRES || '15m',
     REFRESH_TOKEN_EXPIRES: process.env.REFRESH_TOKEN_EXPIRES || '7d',
 
+    // API Keys
+    API_KEY_SALT: process.env.API_KEY_SALT,
+
     // Email — Brevo HTTP API
     BREVO_API_KEY: process.env.BREVO_API_KEY,
     BREVO_SENDER_EMAIL: process.env.BREVO_SENDER_EMAIL || 'aditya.singh.in01@gmail.com',

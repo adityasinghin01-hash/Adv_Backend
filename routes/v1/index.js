@@ -16,6 +16,7 @@ const waitlistRoutes = require('./waitlist.routes');
 const blogRoutes = require('./blog.routes');
 const adminRoutes = require('./admin.routes');
 const subscriptionRoutes = require('./subscription.routes');
+const apiKeyRoutes = require('./apikeys.routes');
 
 // ── Auth ─────────────────────────────────────────────────
 router.use('/', authRoutes);
@@ -46,6 +47,9 @@ router.use('/admin', adminRoutes);
 
 // ── Subscriptions ────────────────────────────────────────
 router.use('/subscriptions', subscriptionRoutes);
+
+// ── API Keys ─────────────────────────────────────────────
+router.use('/apikeys', apiKeyRoutes);
 
 module.exports = router;
 

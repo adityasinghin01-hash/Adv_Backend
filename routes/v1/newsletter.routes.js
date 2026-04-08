@@ -30,6 +30,6 @@ router.post('/subscribe', newsletterLimiter, subscribeValidation, subscribe);
 router.get('/unsubscribe', unsubscribe);
 
 // Admin only routes
-router.get('/subscribers', authMiddleware, authorize(permissions.READ_USERS), getSubscribers);
+router.get('/subscribers', authMiddleware(), authorize(permissions.READ_USERS), getSubscribers);
 
 module.exports = router;

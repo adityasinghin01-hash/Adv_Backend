@@ -51,8 +51,8 @@ router.get('/', blogReadLimiter, getPosts);
 router.get('/:slug', blogReadLimiter, getPostBySlug);
 
 // Admin only routes
-router.post('/', authMiddleware, authorize(permissions.MODERATE_POSTS), postValidation, createPost);
-router.put('/:slug', authMiddleware, authorize(permissions.MODERATE_POSTS), postValidation, updatePost);
-router.delete('/:slug', authMiddleware, authorize(permissions.MODERATE_POSTS), deletePost);
+router.post('/', authMiddleware(), authorize(permissions.MODERATE_POSTS), postValidation, createPost);
+router.put('/:slug', authMiddleware(), authorize(permissions.MODERATE_POSTS), postValidation, updatePost);
+router.delete('/:slug', authMiddleware(), authorize(permissions.MODERATE_POSTS), deletePost);
 
 module.exports = router;
