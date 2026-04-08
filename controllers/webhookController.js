@@ -5,7 +5,7 @@ const { validationResult } = require('express-validator');
 const Webhook = require('../models/Webhook');
 const WebhookDelivery = require('../models/WebhookDelivery');
 const { VALID_EVENTS } = require('../config/webhookEvents');
-const { generateSecret, encryptSecret, emit, dispatchWithRetry } = require('../services/webhookService');
+const { generateSecret, encryptSecret, dispatchWithRetry } = require('../services/webhookService');
 const logger = require('../config/logger');
 
 /**
@@ -150,9 +150,9 @@ exports.updateWebhook = async (req, res, next) => {
       webhook.events = events;
     }
 
-    if (url !== undefined) webhook.url = url;
-    if (description !== undefined) webhook.description = description;
-    if (isActive !== undefined) webhook.isActive = isActive;
+    if (url !== undefined) {webhook.url = url;}
+    if (description !== undefined) {webhook.description = description;}
+    if (isActive !== undefined) {webhook.isActive = isActive;}
 
     await webhook.save();
 

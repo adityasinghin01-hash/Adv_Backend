@@ -167,7 +167,7 @@ const dispatchWithRetry = async (webhook, event, payload, attempt = 1) => {
       const chunks = [];
       let byteCount = 0;
       res.on('data', (d) => {
-        if (byteCount >= MAX_RESPONSE_BYTES) return;
+        if (byteCount >= MAX_RESPONSE_BYTES) {return;}
         const remaining = MAX_RESPONSE_BYTES - byteCount;
         const slice = d.length > remaining ? d.slice(0, remaining) : d;
         chunks.push(slice);
@@ -363,19 +363,19 @@ const processRetryQueue = async () => {
   try {
     // Atomic claim loop — avoids TOCTOU race by matching AND clearing nextRetryAt in one operation
     const deliveries = [];
-    // eslint-disable-next-line no-constant-condition
+     
     while (true) {
       const delivery = await WebhookDelivery.findOneAndUpdate(
         { success: false, nextRetryAt: { $lte: new Date() } },
         { $unset: { nextRetryAt: 1 } },
         { returnDocument: 'after' }
       );
-      if (!delivery) break;
+      if (!delivery) {break;}
       deliveries.push(delivery);
-      if (deliveries.length >= 50) break; // batch size cap
+      if (deliveries.length >= 50) {break;} // batch size cap
     }
 
-    if (deliveries.length === 0) return;
+    if (deliveries.length === 0) {return;}
 
     logger.info(`Webhook retry worker found ${deliveries.length} pending retries`);
 
@@ -416,7 +416,7 @@ const processRetryQueue = async () => {
  * Start the background retry worker. Call once from server.js after DB connects.
  */
 const startWebhookRetryWorker = () => {
-  if (retryWorkerTimer) return; // idempotent
+  if (retryWorkerTimer) {return;} // idempotent
   logger.info('🔁 Webhook retry worker started (polling every 60s)');
   retryWorkerTimer = setInterval(processRetryQueue, RETRY_POLL_INTERVAL);
   // Run once immediately to pick up anything pending from before restart
@@ -436,7 +436,7 @@ const stopWebhookRetryWorker = () => {
     logger.info('🛑 Webhook retry worker stopped');
   }
   // Clear all pending retry timers
-  for (const [key, timerId] of retryTimers) {
+  for (const [_key, timerId] of retryTimers) {
     clearTimeout(timerId);
   }
   if (retryTimers.size > 0) {

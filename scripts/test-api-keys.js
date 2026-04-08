@@ -40,7 +40,7 @@ function request(method, path, headers = {}, body = null) {
       req.destroy(new Error('Request timeout'));
     });
     req.on('error', reject);
-    if (data) req.write(data);
+    if (data) {req.write(data);}
     req.end();
   });
 }
@@ -53,7 +53,7 @@ async function requestWithRetry(method, path, headers = {}, body = null, retries
   let attempt = 0;
   while (true) {
     const resp = await request(method, path, headers, body);
-    if (resp.status !== 429 || attempt >= retries) return resp;
+    if (resp.status !== 429 || attempt >= retries) {return resp;}
     attempt++;
     const wait = backoff * Math.pow(2, attempt - 1);
     console.log(`⏳ Received 429 – retry ${attempt}/${retries} after ${wait} ms`);

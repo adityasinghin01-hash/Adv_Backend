@@ -46,7 +46,7 @@ server.headersTimeout = 66000;
 let isShuttingDown = false;
 
 const gracefulShutdown = async (signal) => {
-    if (isShuttingDown) return; // Prevent double shutdown
+    if (isShuttingDown) {return;} // Prevent double shutdown
     isShuttingDown = true;
 
     logger.info(`${signal} received. Starting graceful shutdown...`);

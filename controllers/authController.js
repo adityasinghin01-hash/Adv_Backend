@@ -249,7 +249,7 @@ const googleLogin = async (req, res, next) => {
             return res.status(403).json({ message: 'Google email not verified' });
         }
 
-        let user = await User.findOne({ email });
+        const user = await User.findOne({ email });
 
         let wasVerified = false;
 
@@ -316,7 +316,7 @@ const refreshToken = async (req, res, next) => {
         let decoded;
         try {
             decoded = require('jsonwebtoken').verify(incomingToken, config.JWT_REFRESH_SECRET);
-        } catch (err) {
+        } catch (_err) {
             return res.status(403).json({ message: 'Invalid or expired refresh token' });
         }
 

@@ -3,7 +3,6 @@
 // MUST be executed after authMiddleware.js.
 
 const Subscription = require('../models/Subscription');
-const Plan = require('../models/Plan');
 const logger = require('../config/logger');
 const { enforceLimit } = require('../services/subscriptionService');
 

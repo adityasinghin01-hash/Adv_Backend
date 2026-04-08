@@ -6,10 +6,8 @@
 const crypto = require('crypto');
 const validator = require('validator');
 const User = require('../models/User');
-const config = require('../config/config');
 const hashToken = require('../utils/hashToken');
 const { sendVerificationEmail } = require('../services/emailService');
-const { generateAccessToken, generateRefreshToken } = require('../services/tokenService');
 const { emit } = require('../services/webhookService');
 const { WEBHOOK_EVENTS } = require('../config/webhookEvents');
 
@@ -69,7 +67,7 @@ const verifyEmail = async (req, res, next) => {
         }, user._id);
 
         const source = req.query.source || 'app';
-        const clientUrl = process.env.CLIENT_URL || 'https://backend-z6cy.onrender.com';
+
 
         if (source === 'web') {
           return res.send(`<!DOCTYPE html>
