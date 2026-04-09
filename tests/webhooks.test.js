@@ -4,9 +4,6 @@
 
 const request = require('supertest');
 const mongoose = require('mongoose');
-const app = require('../app');
-const User = require('../models/User');
-const Webhook = require('../models/Webhook');
 
 const MONGO_URI = process.env.MONGO_URI_TEST;
 
@@ -18,6 +15,9 @@ const TEST_USER = {
   name: 'Webhook Test',
 };
 
+let app;
+let User;
+let Webhook;
 let token;
 let userId;
 let webhookId;
@@ -29,6 +29,11 @@ beforeAll(async () => {
   if (mongoose.connection.readyState === 0) {
     await mongoose.connect(MONGO_URI);
   }
+
+  // Lazy-load app and models after env vars are validated
+  app = require('../app');
+  User = require('../models/User');
+  Webhook = require('../models/Webhook');
 
   // Delete any stale test user from previous runs, then create fresh
   // This avoids issues with password corruption from prior runs

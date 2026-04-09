@@ -3,9 +3,10 @@
 
 const request = require('supertest');
 const mongoose = require('mongoose');
-const app = require('../app');
 
 const MONGO_URI = process.env.MONGO_URI_TEST;
+
+let app;
 
 beforeAll(async () => {
   if (!MONGO_URI) {
@@ -14,6 +15,7 @@ beforeAll(async () => {
   if (mongoose.connection.readyState === 0) {
     await mongoose.connect(MONGO_URI);
   }
+  app = require('../app');
 });
 
 afterAll(async () => {

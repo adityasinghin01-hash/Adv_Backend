@@ -9,7 +9,6 @@ module.exports = [
       ecmaVersion: 2021,
       globals: {
         ...globals.node,
-        ...globals.jest,
       },
     },
     rules: {
@@ -25,6 +24,14 @@ module.exports = [
       'no-var': 'error',
       'eqeqeq': ['error', 'always'],
       'curly': ['error', 'all'],
+    },
+  },
+  {
+    files: ['**/*.test.js', '**/*.spec.js', '**/tests/**/*.js'],
+    languageOptions: {
+      globals: {
+        ...globals.jest,
+      },
     },
   },
 ];

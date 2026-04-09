@@ -55,5 +55,12 @@ jobs:
       - name: Install dependencies
         run: npm install
 
+      - name: Validate required secrets
+        run: |
+          if [ -z "$WEBHOOK_SECRET_KEY" ]; then
+            echo "ERROR: WEBHOOK_SECRET_KEY secret is not set or empty"
+            exit 1
+          fi
+
       - name: Run tests
         run: npm test
