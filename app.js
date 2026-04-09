@@ -12,6 +12,7 @@ const config = require('./config/config');
 const { globalLimiter } = require('./middleware/rateLimiter');
 const errorHandler = require('./middleware/errorHandler');
 const { httpLogger } = require('./middleware/requestLogger');
+const securityHeaders = require('./middleware/securityHeaders');
 
 const app = express();
 app.set('trust proxy', 1);
@@ -28,6 +29,10 @@ app.use(helmet({
     },
     crossOriginEmbedderPolicy: false,   // Not needed for API-only backend
 }));
+
+// ── 1b. Additional Security Headers ──────────────────────
+// Supplements helmet with COEP, COOP, CORP, Permissions-Policy
+app.use(securityHeaders);
 
 // ── 2. CORS (whitelist only) ──────────────────────────────
 // Fixes B-08: old version had cors() with zero config — allowed every origin
