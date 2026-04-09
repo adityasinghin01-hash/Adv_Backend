@@ -57,8 +57,12 @@ jobs:
 
       - name: Validate required secrets
         run: |
-          if [ -z "$WEBHOOK_SECRET_KEY" ]; then
-            echo "ERROR: WEBHOOK_SECRET_KEY secret is not set or empty"
+          if [[ -z "$WEBHOOK_SECRET_KEY" ]]; then
+            echo "ERROR: WEBHOOK_SECRET_KEY is not set"
+            exit 1
+          fi
+          if ! [[ "$WEBHOOK_SECRET_KEY" =~ ^[0-9a-fA-F]{64}$ ]]; then
+            echo "ERROR: WEBHOOK_SECRET_KEY must be exactly 64 hex characters"
             exit 1
           fi
 

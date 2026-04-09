@@ -60,10 +60,17 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
-  // Clean up all test data
-  await Webhook.deleteMany({ userId });
-  await User.findByIdAndDelete(userId);
-  await mongoose.connection.close();
+  try {
+    if (userId) {
+      await Webhook.deleteMany({ userId });
+      await User.findByIdAndDelete(userId);
+    }
+  } catch (err) {
+    console.warn('Teardown warning:', err.message);
+  }
+  if (mongoose.connection.readyState !== 0) {
+    await mongoose.connection.close();
+  }
 });
 
 // ── CREATE ─────────────────────────────────────────────────
