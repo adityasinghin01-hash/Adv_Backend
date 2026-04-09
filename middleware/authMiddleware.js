@@ -46,7 +46,7 @@ const protect = () => {
             req.authType = 'jwt'; // Explicitly mark the auth context
 
             next();
-        } catch (error) {
+        } catch (_error) {
             return res.status(401).json({ message: 'Unauthorized — invalid token' });
         }
     };

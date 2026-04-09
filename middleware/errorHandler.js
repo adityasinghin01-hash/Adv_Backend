@@ -5,16 +5,16 @@
 
 const logger = require('../config/logger');
 
-const errorHandler = (err, req, res, next) => {
+const errorHandler = (err, req, res, _next) => {
     // ── Determine status code ────────────────────────────────
     // Map known error types to proper HTTP codes so they don't leak as 500s
     let statusCode = err.statusCode || 500;
 
-    if (err.name === 'ValidationError') statusCode = 400;       // Mongoose validation
-    if (err.name === 'CastError') statusCode = 400;             // Mongoose bad ObjectId
-    if (err.name === 'JsonWebTokenError') statusCode = 401;     // JWT malformed
-    if (err.name === 'TokenExpiredError') statusCode = 401;     // JWT expired
-    if (err.code === 11000) statusCode = 409;                   // MongoDB duplicate key
+    if (err.name === 'ValidationError') {statusCode = 400;}       // Mongoose validation
+    if (err.name === 'CastError') {statusCode = 400;}             // Mongoose bad ObjectId
+    if (err.name === 'JsonWebTokenError') {statusCode = 401;}     // JWT malformed
+    if (err.name === 'TokenExpiredError') {statusCode = 401;}     // JWT expired
+    if (err.code === 11000) {statusCode = 409;}                   // MongoDB duplicate key
 
     // ── Determine user-facing message ────────────────────────
     // Never expose raw error messages for 500s in production

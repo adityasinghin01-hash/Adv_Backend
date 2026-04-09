@@ -6,7 +6,6 @@
 const crypto = require('crypto');
 const validator = require('validator');
 const User = require('../models/User');
-const config = require('../config/config');
 const hashToken = require('../utils/hashToken');
 const validatePassword = require('../utils/passwordValidator');
 const { sendPasswordResetEmail, sendOtpEmail } = require('../services/emailService');
@@ -131,7 +130,7 @@ const renderResetPage = async (req, res, next) => {
 </body>
 </html>`;
 
-        if (!token) return res.status(400).send(errorHtml);
+        if (!token) {return res.status(400).send(errorHtml);}
 
         const hashedToken = hashToken(token);
         const user = await User.findOne({
@@ -139,7 +138,7 @@ const renderResetPage = async (req, res, next) => {
             resetTokenExpiry: { $gt: Date.now() },
         });
 
-        if (!user) return res.status(400).send(errorHtml);
+        if (!user) {return res.status(400).send(errorHtml);}
 
         return res.status(200).send(`<!DOCTYPE html>
 <html>

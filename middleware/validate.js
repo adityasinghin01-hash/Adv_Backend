@@ -55,7 +55,7 @@ const schemas = {
     passwordField('newPassword'),
     body('confirmPassword').notEmpty().withMessage('Please confirm your password.'),
     body('newPassword').custom((value, { req }) => {
-      if (value !== req.body.confirmPassword) throw new Error('Passwords do not match.');
+      if (value !== req.body.confirmPassword) {throw new Error('Passwords do not match.');}
       return true;
     }),
   ]),

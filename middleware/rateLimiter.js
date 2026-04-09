@@ -37,7 +37,7 @@ const makeRedisMiddleware = (limiterKey, fallbackMax, windowMs, keyGenerator = i
     message: { success: false, message: 'Too many requests. Please try again later.' },
   });
 
-  if (!useRedis) return fallback;
+  if (!useRedis) {return fallback;}
 
   return async (req, res, next) => {
     try {

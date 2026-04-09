@@ -19,15 +19,23 @@ const retryTimers = new Map();
 
 // ── Encryption Key ───────────────────────────────────────
 // AES-256-GCM requires a 32-byte key (64 hex chars).
-// Fail fast at startup if not set — webhook signing cannot work without it.
-const ENCRYPTION_KEY_HEX = process.env.WEBHOOK_SECRET_KEY;
-if (!ENCRYPTION_KEY_HEX || ENCRYPTION_KEY_HEX.length !== 64) {
-  throw new Error(
-    'WEBHOOK_SECRET_KEY must be set to a 64-character hex string (32 bytes). ' +
-    'Generate with: node -e "console.log(require(\'crypto\').randomBytes(32).toString(\'hex\'))"'
-  );
-}
-const ENCRYPTION_KEY = Buffer.from(ENCRYPTION_KEY_HEX, 'hex');
+// Lazy resolution — validated on first use, not at import time,
+// so the module can be safely required in tests.
+let _encryptionKey = null;
+const getEncryptionKey = () => {
+  if (_encryptionKey) {
+    return _encryptionKey;
+  }
+  const hex = process.env.WEBHOOK_SECRET_KEY;
+  if (!hex || !/^[0-9a-f]{64}$/i.test(hex)) {
+    throw new Error(
+      'WEBHOOK_SECRET_KEY must be set to a 64-character hex string (32 bytes). ' +
+      'Generate with: node -e "console.log(require(\'crypto\').randomBytes(32).toString(\'hex\'))"'
+    );
+  }
+  _encryptionKey = Buffer.from(hex, 'hex');
+  return _encryptionKey;
+};
 
 // ── Helpers ──────────────────────────────────────────────
 
@@ -42,7 +50,7 @@ const generateSecret = () => crypto.randomBytes(32).toString('hex');
  */
 const encryptSecret = (rawSecret) => {
   const iv = crypto.randomBytes(12); // 96-bit IV recommended for GCM
-  const cipher = crypto.createCipheriv('aes-256-gcm', ENCRYPTION_KEY, iv);
+  const cipher = crypto.createCipheriv('aes-256-gcm', getEncryptionKey(), iv);
   let encrypted = cipher.update(rawSecret, 'utf8', 'hex');
   encrypted += cipher.final('hex');
   const authTag = cipher.getAuthTag().toString('hex');
@@ -75,7 +83,7 @@ const decryptSecret = (encryptedSecret) => {
 
   const decipher = crypto.createDecipheriv(
     'aes-256-gcm',
-    ENCRYPTION_KEY,
+    getEncryptionKey(),
     Buffer.from(ivHex, 'hex')
   );
   decipher.setAuthTag(Buffer.from(authTagHex, 'hex'));
@@ -167,7 +175,7 @@ const dispatchWithRetry = async (webhook, event, payload, attempt = 1) => {
       const chunks = [];
       let byteCount = 0;
       res.on('data', (d) => {
-        if (byteCount >= MAX_RESPONSE_BYTES) return;
+        if (byteCount >= MAX_RESPONSE_BYTES) {return;}
         const remaining = MAX_RESPONSE_BYTES - byteCount;
         const slice = d.length > remaining ? d.slice(0, remaining) : d;
         chunks.push(slice);
@@ -363,19 +371,19 @@ const processRetryQueue = async () => {
   try {
     // Atomic claim loop — avoids TOCTOU race by matching AND clearing nextRetryAt in one operation
     const deliveries = [];
-    // eslint-disable-next-line no-constant-condition
+     
     while (true) {
       const delivery = await WebhookDelivery.findOneAndUpdate(
         { success: false, nextRetryAt: { $lte: new Date() } },
         { $unset: { nextRetryAt: 1 } },
         { returnDocument: 'after' }
       );
-      if (!delivery) break;
+      if (!delivery) {break;}
       deliveries.push(delivery);
-      if (deliveries.length >= 50) break; // batch size cap
+      if (deliveries.length >= 50) {break;} // batch size cap
     }
 
-    if (deliveries.length === 0) return;
+    if (deliveries.length === 0) {return;}
 
     logger.info(`Webhook retry worker found ${deliveries.length} pending retries`);
 
@@ -416,7 +424,7 @@ const processRetryQueue = async () => {
  * Start the background retry worker. Call once from server.js after DB connects.
  */
 const startWebhookRetryWorker = () => {
-  if (retryWorkerTimer) return; // idempotent
+  if (retryWorkerTimer) {return;} // idempotent
   logger.info('🔁 Webhook retry worker started (polling every 60s)');
   retryWorkerTimer = setInterval(processRetryQueue, RETRY_POLL_INTERVAL);
   // Run once immediately to pick up anything pending from before restart
@@ -436,7 +444,7 @@ const stopWebhookRetryWorker = () => {
     logger.info('🛑 Webhook retry worker stopped');
   }
   // Clear all pending retry timers
-  for (const [key, timerId] of retryTimers) {
+  for (const [_key, timerId] of retryTimers) {
     clearTimeout(timerId);
   }
   if (retryTimers.size > 0) {
