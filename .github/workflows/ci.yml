@@ -37,7 +37,7 @@ jobs:
       NODE_ENV: test
       MONGO_URI: ${{ secrets.MONGO_URI }}
       MONGO_URI_TEST: ${{ secrets.MONGO_URI_TEST }}
-      JWT_SECRET: ${{ secrets.JWT_SECRET }}
+      JWT_ACCESS_SECRET: ${{ secrets.JWT_ACCESS_SECRET }}
       JWT_REFRESH_SECRET: ${{ secrets.JWT_REFRESH_SECRET }}
       WEBHOOK_SECRET_KEY: ${{ secrets.WEBHOOK_SECRET_KEY }}
       API_KEY_SALT: ${{ secrets.API_KEY_SALT }}
