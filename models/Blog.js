@@ -6,6 +6,7 @@ const blogSchema = new mongoose.Schema(
       type: String,
       required: true,
       trim: true,
+      maxlength: 200,
     },
     slug: {
       type: String,
@@ -17,15 +18,18 @@ const blogSchema = new mongoose.Schema(
     content: {
       type: String,
       required: true,
+      maxlength: 100000,
     },
     excerpt: {
       type: String,
       trim: true,
+      maxlength: 500,
     },
     author: {
       type: String,
       required: true,
       trim: true,
+      maxlength: 100,
     },
     tags: {
       type: [String],

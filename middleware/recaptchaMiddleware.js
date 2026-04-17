@@ -3,6 +3,7 @@
 // Dev bypass: when NODE_ENV=development AND token='dev-bypass', skips verification.
 // TECH_DECISIONS §2.1: reCAPTCHA on BOTH signup AND login (fixes B-13).
 const config = require('../config/config');
+const logger = require('../config/logger');
 
 const verifyRecaptcha = async (req, res, next) => {
     const { recaptchaToken } = req.body;
@@ -27,7 +28,7 @@ const verifyRecaptcha = async (req, res, next) => {
 
         next();
     } catch (error) {
-        console.error('reCAPTCHA verification error:', error.message);
+        logger.error('reCAPTCHA verification error', { error: error.message });
         return res.status(500).json({ message: 'reCAPTCHA verification error' });
     }
 };

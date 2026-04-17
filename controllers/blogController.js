@@ -3,7 +3,7 @@ const Blog = require('../models/Blog');
 const generateSlug = require('../utils/slugGenerator');
 
 // POST /api/blog — admin only
-const createPost = async (req, res) => {
+const createPost = async (req, res, next) => {
   try {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
@@ -32,16 +32,15 @@ const createPost = async (req, res) => {
 
     return res.status(201).json({ message: 'Blog post created.', post });
   } catch (err) {
-    console.error('Blog create error:', err);
-    return res.status(500).json({ message: 'Something went wrong.' });
+    next(err);
   }
 };
 
 // GET /api/blog — public, paginated
-const getPosts = async (req, res) => {
+const getPosts = async (req, res, next) => {
   try {
-    const page = parseInt(req.query.page) || 1;
-    const limit = parseInt(req.query.limit) || 10;
+    const page = Math.max(1, parseInt(req.query.page, 10) || 1);
+    const limit = Math.min(100, Math.max(1, parseInt(req.query.limit, 10) || 10));
     const skip = (page - 1) * limit;
 
     const filter = { published: true };
@@ -60,13 +59,12 @@ const getPosts = async (req, res) => {
       posts,
     });
   } catch (err) {
-    console.error('Blog fetch error:', err);
-    return res.status(500).json({ message: 'Something went wrong.' });
+    next(err);
   }
 };
 
 // GET /api/blog/:slug — public
-const getPostBySlug = async (req, res) => {
+const getPostBySlug = async (req, res, next) => {
   try {
     const post = await Blog.findOne({ slug: req.params.slug, published: true });
     if (!post) {
@@ -74,13 +72,12 @@ const getPostBySlug = async (req, res) => {
     }
     return res.status(200).json({ post });
   } catch (err) {
-    console.error('Blog fetch by slug error:', err);
-    return res.status(500).json({ message: 'Something went wrong.' });
+    next(err);
   }
 };
 
 // PUT /api/blog/:slug — admin only
-const updatePost = async (req, res) => {
+const updatePost = async (req, res, next) => {
   try {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
@@ -114,13 +111,12 @@ const updatePost = async (req, res) => {
 
     return res.status(200).json({ message: 'Post updated.', post });
   } catch (err) {
-    console.error('Blog update error:', err);
-    return res.status(500).json({ message: 'Something went wrong.' });
+    next(err);
   }
 };
 
 // DELETE /api/blog/:slug — admin only
-const deletePost = async (req, res) => {
+const deletePost = async (req, res, next) => {
   try {
     const post = await Blog.findOneAndDelete({ slug: req.params.slug });
     if (!post) {
@@ -128,8 +124,7 @@ const deletePost = async (req, res) => {
     }
     return res.status(200).json({ message: 'Post deleted.' });
   } catch (err) {
-    console.error('Blog delete error:', err);
-    return res.status(500).json({ message: 'Something went wrong.' });
+    next(err);
   }
 };
 

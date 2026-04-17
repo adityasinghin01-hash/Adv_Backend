@@ -3,10 +3,15 @@
 
 const express = require('express');
 const router = express.Router();
+const { param } = require('express-validator');
 const { protect: authMiddleware } = require('../../middleware/authMiddleware');
 const { authorize } = require('../../middleware/rbacMiddleware');
 const { permissions } = require('../../config/roles');
 const adminController = require('../../controllers/adminController');
+
+const idValidation = [
+    param('id').isMongoId().withMessage('Invalid user ID format.'),
+];
 
 // All admin routes require authentication
 router.use(authMiddleware());
@@ -32,6 +37,7 @@ router.get(
 // ── PUT /api/v1/admin/users/:id/role
 router.put(
     '/users/:id/role',
+    idValidation,
     authorize(permissions.UPDATE_ROLE),
     adminController.updateUserRole
 );
@@ -39,6 +45,7 @@ router.put(
 // ── PUT /api/v1/admin/users/:id/ban
 router.put(
     '/users/:id/ban',
+    idValidation,
     authorize(permissions.MODERATE_USERS),
     adminController.toggleUserBan
 );

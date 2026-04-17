@@ -2,6 +2,7 @@
 // Handles: verifyEmail, resendVerification, checkVerificationStatus.
 // Per ARCHITECTURE_MAP §3.4–3.6.
 // Fixes B-03 (hash tokens), B-05 (enforce expiry), B-07 (15min consistent), B-18 (no enumeration).
+const logger = require('../config/logger');
 
 const crypto = require('crypto');
 const validator = require('validator');
@@ -165,12 +166,11 @@ const resendVerification = async (req, res, next) => {
 
         // Send email (not async — we want to confirm it sent before responding)
         try {
-            console.log('📧 [Resend] Attempting to send verification email for:', email);
+            logger.info('Attempting to send verification email (resend)', { email });
             await sendVerificationEmail(email, rawToken);
-            console.log('✅ [Resend] Verification email sent for:', email);
+            logger.info('Verification email sent (resend)', { email });
         } catch (err) {
-            console.error('❌ [Resend] Email send failed:', err.message);
-            console.error('❌ [Resend] Full error:', err);
+            logger.error('Verification email send failed (resend)', { email, error: err.message });
             // Even if email fails, we return a generic success to prevent enumeration
         }
 

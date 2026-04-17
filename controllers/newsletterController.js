@@ -7,7 +7,7 @@ const hashToken = require('../utils/hashToken');
 const config = require('../config/config');
 
 // POST /api/v1/newsletter/subscribe
-const subscribe = async (req, res) => {
+const subscribe = async (req, res, next) => {
   try {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
@@ -55,13 +55,12 @@ const subscribe = async (req, res) => {
     return res.status(201).json({ message: 'Successfully subscribed to the newsletter.' });
 
   } catch (err) {
-    console.error('Newsletter subscribe error:', err);
-    return res.status(500).json({ message: 'Something went wrong. Please try again.' });
+    next(err);
   }
 };
 
 // GET /api/v1/newsletter/unsubscribe
-const unsubscribe = async (req, res) => {
+const unsubscribe = async (req, res, next) => {
   try {
     const { token } = req.query;
 
@@ -97,19 +96,17 @@ const unsubscribe = async (req, res) => {
     return res.status(200).json({ message: 'Successfully unsubscribed.' });
 
   } catch (err) {
-    console.error('Newsletter unsubscribe error:', err);
-    return res.status(500).json({ message: 'Something went wrong. Please try again.' });
+    next(err);
   }
 };
 
 // GET /api/v1/newsletter/subscribers — admin only
-const getSubscribers = async (req, res) => {
+const getSubscribers = async (req, res, next) => {
   try {
     const subscribers = await Subscriber.find({ isActive: true }).sort({ createdAt: -1 });
     return res.status(200).json({ count: subscribers.length, subscribers });
   } catch (err) {
-    console.error('Get subscribers error:', err);
-    return res.status(500).json({ message: 'Something went wrong.' });
+    next(err);
   }
 };
 

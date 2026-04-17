@@ -3,6 +3,7 @@
 // Per ARCHITECTURE_MAP §3.1–3.8.
 
 const crypto = require('crypto');
+const logger = require('../config/logger');
 const validator = require('validator');
 const { OAuth2Client } = require('google-auth-library');
 const User = require('../models/User');
@@ -17,7 +18,7 @@ const { WEBHOOK_EVENTS } = require('../config/webhookEvents');
 
 const googleClient = new OAuth2Client(config.GOOGLE_CLIENT_ID);
 
-const VERIFICATION_TOKEN_EXPIRY = 15 * 60 * 1000; // 15 minutes — consistent everywhere (fixes B-07)
+const VERIFICATION_TOKEN_EXPIRY = 24 * 60 * 60 * 1000; // 24 hours — matches verificationController
 
 // ── Signup ────────────────────────────────────────────────
 // ARCHITECTURE_MAP §3.1
@@ -65,12 +66,11 @@ const signup = async (req, res, next) => {
             // Send verification email async (after response)
             setImmediate(async () => {
                 try {
-                    console.log('📧 [Signup Re-send] Queuing verification email for:', email);
+                    logger.info('Queuing verification email (re-send)', { email });
                     await sendVerificationEmail(email, rawToken, source);
-                    console.log('✅ [Signup Re-send] Verification email sent for:', email);
+                    logger.info('Verification email sent (re-send)', { email });
                 } catch (err) {
-                    console.error('❌ [Signup Re-send] Email send failed:', err.message);
-                    console.error('❌ [Signup Re-send] Full error:', err);
+                    logger.error('Email send failed (re-send)', { email, error: err.message });
                 }
             });
 
@@ -117,18 +117,17 @@ const signup = async (req, res, next) => {
                 pendingSubscriptionCreation: false 
             });
         } catch (err) {
-            console.error('⚠️ [Signup] Failed to create default subscription. Will be reconciled later:', err.message);
+            logger.error('Failed to create default subscription — will be reconciled later', { userId: newUser._id, error: err.message });
             // pendingSubscriptionCreation remains true via schema default
         }
 
         setImmediate(async () => {
             try {
-                console.log('📧 [Signup New] Queuing verification email for:', email);
+                logger.info('Queuing verification email (new user)', { email });
                 await sendVerificationEmail(email, rawToken, source);
-                console.log('✅ [Signup New] Verification email sent for:', email);
+                logger.info('Verification email sent (new user)', { email });
             } catch (err) {
-                console.error('❌ [Signup New] Email send failed:', err.message);
-                console.error('❌ [Signup New] Full error:', err);
+                logger.error('Email send failed (new user)', { email, error: err.message });
             }
         });
 
@@ -343,26 +342,26 @@ const refreshToken = async (req, res, next) => {
         const newAccessToken = generateAccessToken(user);
         const newRefreshToken = generateRefreshToken(user, decoded.rememberMe || false);
 
-        // Remove old token and add new one atomically
+        // Atomic: remove old token + add new one in a single DB operation
         await User.findByIdAndUpdate(
           user._id,
-          {
-            $pull: { refreshTokens: { tokenHash: hashedIncoming } },
-          },
-          { new: true }
-        );
-
-        await User.findByIdAndUpdate(
-          user._id,
-          {
-            $push: {
+          [
+            { $set: {
               refreshTokens: {
-                tokenHash: hashToken(newRefreshToken),
-                createdAt: new Date(),
-                deviceInfo: req.headers['user-agent'] || 'unknown',
-              },
-            },
-          }
+                $concatArrays: [
+                  { $filter: {
+                    input: '$refreshTokens',
+                    cond: { $ne: ['$$this.tokenHash', hashedIncoming] }
+                  }},
+                  [{
+                    tokenHash: hashToken(newRefreshToken),
+                    createdAt: new Date(),
+                    deviceInfo: req.headers['user-agent'] || 'unknown',
+                  }]
+                ]
+              }
+            }}
+          ]
         );
 
         return res.status(200).json({

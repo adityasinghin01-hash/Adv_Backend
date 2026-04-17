@@ -2,6 +2,7 @@
 // Handles: forgotPassword, resetPassword, renderResetPage.
 // Per ARCHITECTURE_MAP §3.9–3.10.
 // Fixes B-05 (enforce token expiry), B-03 (hash tokens), B-18 pattern (generic responses).
+const logger = require('../config/logger');
 
 const crypto = require('crypto');
 const validator = require('validator');
@@ -180,7 +181,7 @@ const sendOtp = async (req, res, next) => {
         }
 
         // Generate 6-digit OTP
-        const rawOtp = Math.floor(10000 + Math.random() * 90000).toString();
+        const rawOtp = crypto.randomInt(100000, 1000000).toString();
         user.otpCode = hashToken(rawOtp);
         user.otpExpiry = Date.now() + 15 * 60 * 1000; // 15 minutes
 
@@ -188,9 +189,9 @@ const sendOtp = async (req, res, next) => {
 
         try {
             await sendOtpEmail(email, rawOtp);
-            console.log('✅ OTP email sent to:', email);
+            logger.info('OTP email sent', { email });
         } catch (err) {
-            console.error('❌ OTP email failed:', err.message);
+            logger.error('OTP email failed', { email, error: err.message });
         }
 
         return res.status(200).json({

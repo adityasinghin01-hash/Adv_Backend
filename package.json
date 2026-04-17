@@ -1,7 +1,8 @@
 {
-  "name": "backend",
+  "name": "spinx-auth-backend",
   "version": "1.0.0",
   "description": "Reusable Node.js auth backend boilerplate",
+  "engines": { "node": ">=20.0.0" },
   "main": "server.js",
   "scripts": {
     "start": "node server.js",

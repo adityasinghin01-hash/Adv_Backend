@@ -2,9 +2,11 @@ const { validationResult } = require('express-validator');
 const Waitlist = require('../models/Waitlist');
 const { sendEmail } = require('../services/emailService');
 const config = require('../config/config');
+const htmlEscape = require('../utils/htmlEscape');
+const csvSanitize = require('../utils/csvSanitize');
 
 // POST /api/waitlist/join
-const joinWaitlist = async (req, res) => {
+const joinWaitlist = async (req, res, next) => {
   try {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
@@ -30,7 +32,7 @@ const joinWaitlist = async (req, res) => {
       subject: 'You are on the waitlist!',
       html: `
         <div style="max-width:480px;margin:0 auto;font-family:Arial,sans-serif;padding:32px 20px;color:#111;">
-          <p style="font-size:16px;">Hi ${name},</p>
+          <p style="font-size:16px;">Hi ${htmlEscape(name)},</p>
           <p style="font-size:15px;line-height:1.6;">You have been added to the Spinx waitlist. Your position is <strong>#${position}</strong>.</p>
           <p style="font-size:15px;line-height:1.6;">We will reach out as soon as your access is ready.</p>
           <p style="font-size:15px;margin-top:24px;">— Aditya Singh<br/>Founder, Spinx</p>
@@ -45,45 +47,42 @@ const joinWaitlist = async (req, res) => {
       subject: 'New Waitlist Signup',
       html: `
         <h2>New Waitlist Entry</h2>
-        <p><strong>Name:</strong> ${name}</p>
-        <p><strong>Email:</strong> ${email}</p>
+        <p><strong>Name:</strong> ${htmlEscape(name)}</p>
+        <p><strong>Email:</strong> ${htmlEscape(email)}</p>
         <p><strong>Position:</strong> #${position}</p>
       `,
     });
 
     return res.status(201).json({ message: 'You have been added to the waitlist.', position });
   } catch (err) {
-    console.error('Waitlist join error:', err);
-    return res.status(500).json({ message: 'Something went wrong. Please try again.' });
+    next(err);
   }
 };
 
 // GET /api/waitlist — admin only (Phase 5)
-const getWaitlist = async (req, res) => {
+const getWaitlist = async (req, res, next) => {
   try {
     const entries = await Waitlist.find({}).sort({ position: 1 });
     return res.status(200).json({ count: entries.length, entries });
   } catch (err) {
-    console.error('Waitlist fetch error:', err);
-    return res.status(500).json({ message: 'Something went wrong.' });
+    next(err);
   }
 };
 
 // GET /api/waitlist/export — admin only (Phase 5)
-const exportWaitlist = async (req, res) => {
+const exportWaitlist = async (req, res, next) => {
   try {
     const entries = await Waitlist.find({}).sort({ position: 1 });
     const csv = [
       'Position,Name,Email,Joined At',
-      ...entries.map(e => `${e.position},${e.name},${e.email},${e.createdAt.toISOString()}`),
+      ...entries.map(e => `${e.position},${csvSanitize(e.name)},${csvSanitize(e.email)},${e.createdAt.toISOString()}`),
     ].join('\n');
 
     res.setHeader('Content-Type', 'text/csv');
     res.setHeader('Content-Disposition', 'attachment; filename="waitlist.csv"');
     return res.status(200).send(csv);
   } catch (err) {
-    console.error('Waitlist export error:', err);
-    return res.status(500).json({ message: 'Something went wrong.' });
+    next(err);
   }
 };
 
