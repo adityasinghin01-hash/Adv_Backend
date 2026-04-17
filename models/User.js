@@ -35,10 +35,12 @@ const userSchema = new mongoose.Schema(
         name: {
             type: String,
             trim: true,
+            maxlength: 100,
         },
 
         picture: {
             type: String, // Google profile picture URL
+            maxlength: 2048,
         },
 
         // ── Role & Moderation ─────────────────────────────────
