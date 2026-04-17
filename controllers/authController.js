@@ -17,7 +17,7 @@ const { WEBHOOK_EVENTS } = require('../config/webhookEvents');
 
 const googleClient = new OAuth2Client(config.GOOGLE_CLIENT_ID);
 
-const VERIFICATION_TOKEN_EXPIRY = 15 * 60 * 1000; // 15 minutes — consistent everywhere (fixes B-07)
+const VERIFICATION_TOKEN_EXPIRY = 24 * 60 * 60 * 1000; // 24 hours — matches verificationController
 
 // ── Signup ────────────────────────────────────────────────
 // ARCHITECTURE_MAP §3.1
@@ -343,26 +343,26 @@ const refreshToken = async (req, res, next) => {
         const newAccessToken = generateAccessToken(user);
         const newRefreshToken = generateRefreshToken(user, decoded.rememberMe || false);
 
-        // Remove old token and add new one atomically
+        // Atomic: remove old token + add new one in a single DB operation
         await User.findByIdAndUpdate(
           user._id,
-          {
-            $pull: { refreshTokens: { tokenHash: hashedIncoming } },
-          },
-          { new: true }
-        );
-
-        await User.findByIdAndUpdate(
-          user._id,
-          {
-            $push: {
+          [
+            { $set: {
               refreshTokens: {
-                tokenHash: hashToken(newRefreshToken),
-                createdAt: new Date(),
-                deviceInfo: req.headers['user-agent'] || 'unknown',
-              },
-            },
-          }
+                $concatArrays: [
+                  { $filter: {
+                    input: '$refreshTokens',
+                    cond: { $ne: ['$$this.tokenHash', hashedIncoming] }
+                  }},
+                  [{
+                    tokenHash: hashToken(newRefreshToken),
+                    createdAt: new Date(),
+                    deviceInfo: req.headers['user-agent'] || 'unknown',
+                  }]
+                ]
+              }
+            }}
+          ]
         );
 
         return res.status(200).json({

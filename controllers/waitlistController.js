@@ -2,6 +2,7 @@ const { validationResult } = require('express-validator');
 const Waitlist = require('../models/Waitlist');
 const { sendEmail } = require('../services/emailService');
 const config = require('../config/config');
+const htmlEscape = require('../utils/htmlEscape');
 
 // POST /api/waitlist/join
 const joinWaitlist = async (req, res) => {
@@ -30,7 +31,7 @@ const joinWaitlist = async (req, res) => {
       subject: 'You are on the waitlist!',
       html: `
         <div style="max-width:480px;margin:0 auto;font-family:Arial,sans-serif;padding:32px 20px;color:#111;">
-          <p style="font-size:16px;">Hi ${name},</p>
+          <p style="font-size:16px;">Hi ${htmlEscape(name)},</p>
           <p style="font-size:15px;line-height:1.6;">You have been added to the Spinx waitlist. Your position is <strong>#${position}</strong>.</p>
           <p style="font-size:15px;line-height:1.6;">We will reach out as soon as your access is ready.</p>
           <p style="font-size:15px;margin-top:24px;">— Aditya Singh<br/>Founder, Spinx</p>
@@ -45,8 +46,8 @@ const joinWaitlist = async (req, res) => {
       subject: 'New Waitlist Signup',
       html: `
         <h2>New Waitlist Entry</h2>
-        <p><strong>Name:</strong> ${name}</p>
-        <p><strong>Email:</strong> ${email}</p>
+        <p><strong>Name:</strong> ${htmlEscape(name)}</p>
+        <p><strong>Email:</strong> ${htmlEscape(email)}</p>
         <p><strong>Position:</strong> #${position}</p>
       `,
     });
