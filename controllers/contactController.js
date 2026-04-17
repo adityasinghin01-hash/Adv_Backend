@@ -5,7 +5,7 @@ const { sendEmail } = require('../services/emailService');
 const config = require('../config/config');
 const htmlEscape = require('../utils/htmlEscape');
 
-const submitContact = async (req, res) => {
+const submitContact = async (req, res, next) => {
   try {
     // Validation check
     const errors = validationResult(req);
@@ -61,8 +61,7 @@ const submitContact = async (req, res) => {
     return res.status(200).json({ message: 'Message sent successfully.' });
 
   } catch (err) {
-    console.error('Contact form error:', err);
-    return res.status(500).json({ message: 'Something went wrong. Please try again.' });
+    next(err);
   }
 };
 

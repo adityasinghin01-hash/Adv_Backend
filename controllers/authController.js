@@ -3,6 +3,7 @@
 // Per ARCHITECTURE_MAP §3.1–3.8.
 
 const crypto = require('crypto');
+const logger = require('../config/logger');
 const validator = require('validator');
 const { OAuth2Client } = require('google-auth-library');
 const User = require('../models/User');
@@ -65,12 +66,11 @@ const signup = async (req, res, next) => {
             // Send verification email async (after response)
             setImmediate(async () => {
                 try {
-                    console.log('📧 [Signup Re-send] Queuing verification email for:', email);
+                    logger.info('Queuing verification email (re-send)', { email });
                     await sendVerificationEmail(email, rawToken, source);
-                    console.log('✅ [Signup Re-send] Verification email sent for:', email);
+                    logger.info('Verification email sent (re-send)', { email });
                 } catch (err) {
-                    console.error('❌ [Signup Re-send] Email send failed:', err.message);
-                    console.error('❌ [Signup Re-send] Full error:', err);
+                    logger.error('Email send failed (re-send)', { email, error: err.message });
                 }
             });
 
@@ -117,18 +117,17 @@ const signup = async (req, res, next) => {
                 pendingSubscriptionCreation: false 
             });
         } catch (err) {
-            console.error('⚠️ [Signup] Failed to create default subscription. Will be reconciled later:', err.message);
+            logger.error('Failed to create default subscription — will be reconciled later', { userId: newUser._id, error: err.message });
             // pendingSubscriptionCreation remains true via schema default
         }
 
         setImmediate(async () => {
             try {
-                console.log('📧 [Signup New] Queuing verification email for:', email);
+                logger.info('Queuing verification email (new user)', { email });
                 await sendVerificationEmail(email, rawToken, source);
-                console.log('✅ [Signup New] Verification email sent for:', email);
+                logger.info('Verification email sent (new user)', { email });
             } catch (err) {
-                console.error('❌ [Signup New] Email send failed:', err.message);
-                console.error('❌ [Signup New] Full error:', err);
+                logger.error('Email send failed (new user)', { email, error: err.message });
             }
         });
 

@@ -5,7 +5,7 @@ const config = require('../config/config');
 const htmlEscape = require('../utils/htmlEscape');
 
 // POST /api/waitlist/join
-const joinWaitlist = async (req, res) => {
+const joinWaitlist = async (req, res, next) => {
   try {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
@@ -54,24 +54,22 @@ const joinWaitlist = async (req, res) => {
 
     return res.status(201).json({ message: 'You have been added to the waitlist.', position });
   } catch (err) {
-    console.error('Waitlist join error:', err);
-    return res.status(500).json({ message: 'Something went wrong. Please try again.' });
+    next(err);
   }
 };
 
 // GET /api/waitlist — admin only (Phase 5)
-const getWaitlist = async (req, res) => {
+const getWaitlist = async (req, res, next) => {
   try {
     const entries = await Waitlist.find({}).sort({ position: 1 });
     return res.status(200).json({ count: entries.length, entries });
   } catch (err) {
-    console.error('Waitlist fetch error:', err);
-    return res.status(500).json({ message: 'Something went wrong.' });
+    next(err);
   }
 };
 
 // GET /api/waitlist/export — admin only (Phase 5)
-const exportWaitlist = async (req, res) => {
+const exportWaitlist = async (req, res, next) => {
   try {
     const entries = await Waitlist.find({}).sort({ position: 1 });
     const csv = [
@@ -83,8 +81,7 @@ const exportWaitlist = async (req, res) => {
     res.setHeader('Content-Disposition', 'attachment; filename="waitlist.csv"');
     return res.status(200).send(csv);
   } catch (err) {
-    console.error('Waitlist export error:', err);
-    return res.status(500).json({ message: 'Something went wrong.' });
+    next(err);
   }
 };
 
