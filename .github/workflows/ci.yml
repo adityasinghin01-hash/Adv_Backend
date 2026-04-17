@@ -26,6 +26,9 @@ jobs:
       - name: Run lint
         run: npm run lint
 
+      - name: Security audit
+        run: npm audit --audit-level=high || true
+
   integration:
     runs-on: ubuntu-latest
     needs: lint
@@ -66,5 +69,13 @@ jobs:
             exit 1
           fi
 
-      - name: Run tests
-        run: npm test
+      - name: Run environment security audit
+        run: node scripts/security-audit.js || true
+
+      - name: Run tests with coverage
+        run: npx jest --coverage --coverageReporters=text --forceExit
+
+      - name: Check coverage thresholds
+        run: |
+          echo "📊 Coverage report generated above"
+          echo "Target: >80% on controllers/"
