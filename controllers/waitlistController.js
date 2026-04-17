@@ -3,6 +3,7 @@ const Waitlist = require('../models/Waitlist');
 const { sendEmail } = require('../services/emailService');
 const config = require('../config/config');
 const htmlEscape = require('../utils/htmlEscape');
+const csvSanitize = require('../utils/csvSanitize');
 
 // POST /api/waitlist/join
 const joinWaitlist = async (req, res, next) => {
@@ -74,7 +75,7 @@ const exportWaitlist = async (req, res, next) => {
     const entries = await Waitlist.find({}).sort({ position: 1 });
     const csv = [
       'Position,Name,Email,Joined At',
-      ...entries.map(e => `${e.position},${e.name},${e.email},${e.createdAt.toISOString()}`),
+      ...entries.map(e => `${e.position},${csvSanitize(e.name)},${csvSanitize(e.email)},${e.createdAt.toISOString()}`),
     ].join('\n');
 
     res.setHeader('Content-Type', 'text/csv');
