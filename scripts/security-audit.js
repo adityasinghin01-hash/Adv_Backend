@@ -47,11 +47,7 @@ console.log('─'.repeat(50));
 
 for (const varName of REQUIRED_VARS) {
   const value = process.env[varName];
-  check(
-    varName,
-    value && value.trim().length > 0,
-    'Not set or empty'
-  );
+  check(varName, value && value.trim().length > 0, 'Not set or empty');
 }
 
 // ── Specific Format Validations ─────────────────────────

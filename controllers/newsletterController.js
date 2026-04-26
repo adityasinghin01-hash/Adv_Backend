@@ -53,7 +53,6 @@ const subscribe = async (req, res, next) => {
     });
 
     return res.status(201).json({ message: 'Successfully subscribed to the newsletter.' });
-
   } catch (err) {
     next(err);
   }
@@ -94,7 +93,6 @@ const unsubscribe = async (req, res, next) => {
     });
 
     return res.status(200).json({ message: 'Successfully unsubscribed.' });
-
   } catch (err) {
     next(err);
   }

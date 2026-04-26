@@ -30,7 +30,7 @@ const getEncryptionKey = () => {
   if (!hex || !/^[0-9a-f]{64}$/i.test(hex)) {
     throw new Error(
       'WEBHOOK_SECRET_KEY must be set to a 64-character hex string (32 bytes). ' +
-      'Generate with: node -e "console.log(require(\'crypto\').randomBytes(32).toString(\'hex\'))"'
+        "Generate with: node -e \"console.log(require('crypto').randomBytes(32).toString('hex'))\""
     );
   }
   _encryptionKey = Buffer.from(hex, 'hex');
@@ -149,10 +149,7 @@ const dispatchWithRetry = async (webhook, event, payload, attempt = 1) => {
 
   // Decrypt the stored secret to compute HMAC-SHA256 signature
   const rawSecret = decryptSecret(webhook.encryptedSecret);
-  const signature = crypto
-    .createHmac('sha256', rawSecret)
-    .update(body)
-    .digest('hex');
+  const signature = crypto.createHmac('sha256', rawSecret).update(body).digest('hex');
 
   const url = new URL(webhook.url);
   const options = {
@@ -175,7 +172,9 @@ const dispatchWithRetry = async (webhook, event, payload, attempt = 1) => {
       const chunks = [];
       let byteCount = 0;
       res.on('data', (d) => {
-        if (byteCount >= MAX_RESPONSE_BYTES) {return;}
+        if (byteCount >= MAX_RESPONSE_BYTES) {
+          return;
+        }
         const remaining = MAX_RESPONSE_BYTES - byteCount;
         const slice = d.length > remaining ? d.slice(0, remaining) : d;
         chunks.push(slice);
@@ -198,9 +197,13 @@ const dispatchWithRetry = async (webhook, event, payload, attempt = 1) => {
             attempt,
             success: isSuccess,
             deliveredAt: new Date(),
-            nextRetryAt: !isSuccess && attempt < MAX_ATTEMPTS
-              ? new Date(Date.now() + (RETRY_DELAYS[attempt - 1] || RETRY_DELAYS[RETRY_DELAYS.length - 1]))
-              : undefined,
+            nextRetryAt:
+              !isSuccess && attempt < MAX_ATTEMPTS
+                ? new Date(
+                    Date.now() +
+                      (RETRY_DELAYS[attempt - 1] || RETRY_DELAYS[RETRY_DELAYS.length - 1])
+                  )
+                : undefined,
           });
           savedDeliveryId = delivery._id;
         } catch (dbErr) {
@@ -245,9 +248,12 @@ const dispatchWithRetry = async (webhook, event, payload, attempt = 1) => {
           attempt,
           success: false,
           deliveredAt: new Date(),
-          nextRetryAt: attempt < MAX_ATTEMPTS
-            ? new Date(Date.now() + (RETRY_DELAYS[attempt - 1] || RETRY_DELAYS[RETRY_DELAYS.length - 1]))
-            : undefined,
+          nextRetryAt:
+            attempt < MAX_ATTEMPTS
+              ? new Date(
+                  Date.now() + (RETRY_DELAYS[attempt - 1] || RETRY_DELAYS[RETRY_DELAYS.length - 1])
+                )
+              : undefined,
         });
         savedDeliveryId = delivery._id;
       } catch (dbErr) {
@@ -371,19 +377,25 @@ const processRetryQueue = async () => {
   try {
     // Atomic claim loop — avoids TOCTOU race by matching AND clearing nextRetryAt in one operation
     const deliveries = [];
-     
+
     while (true) {
       const delivery = await WebhookDelivery.findOneAndUpdate(
         { success: false, nextRetryAt: { $lte: new Date() } },
         { $unset: { nextRetryAt: 1 } },
         { returnDocument: 'after' }
       );
-      if (!delivery) {break;}
+      if (!delivery) {
+        break;
+      }
       deliveries.push(delivery);
-      if (deliveries.length >= 50) {break;} // batch size cap
+      if (deliveries.length >= 50) {
+        break;
+      } // batch size cap
     }
 
-    if (deliveries.length === 0) {return;}
+    if (deliveries.length === 0) {
+      return;
+    }
 
     logger.info(`Webhook retry worker found ${deliveries.length} pending retries`);
 
@@ -424,7 +436,9 @@ const processRetryQueue = async () => {
  * Start the background retry worker. Call once from server.js after DB connects.
  */
 const startWebhookRetryWorker = () => {
-  if (retryWorkerTimer) {return;} // idempotent
+  if (retryWorkerTimer) {
+    return;
+  } // idempotent
   logger.info('🔁 Webhook retry worker started (polling every 60s)');
   retryWorkerTimer = setInterval(processRetryQueue, RETRY_POLL_INTERVAL);
   // Run once immediately to pick up anything pending from before restart

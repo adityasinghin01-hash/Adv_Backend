@@ -1,7 +1,11 @@
 const express = require('express');
 const router = express.Router();
 const { body } = require('express-validator');
-const { subscribe, unsubscribe, getSubscribers } = require('../../controllers/newsletterController');
+const {
+  subscribe,
+  unsubscribe,
+  getSubscribers,
+} = require('../../controllers/newsletterController');
 const rateLimit = require('express-rate-limit');
 const { protect: authMiddleware } = require('../../middleware/authMiddleware');
 const { authorize } = require('../../middleware/rbacMiddleware');
@@ -20,8 +24,10 @@ const newsletterLimiter = rateLimit({
 const subscribeValidation = [
   body('email')
     .trim()
-    .notEmpty().withMessage('Email is required.')
-    .isEmail().withMessage('Please provide a valid email address.')
+    .notEmpty()
+    .withMessage('Email is required.')
+    .isEmail()
+    .withMessage('Please provide a valid email address.')
     .normalizeEmail({ gmail_remove_dots: false }),
 ];
 

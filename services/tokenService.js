@@ -8,34 +8,33 @@ const crypto = require('crypto');
 const config = require('../config/config');
 
 const generateAccessToken = (user) => {
-    return jwt.sign(
-        {
-            id: user._id,
-            email: user.email,
-            role: user.role, // Added role for RBAC
-            isVerified: user.isVerified,
-            jti: crypto.randomBytes(16).toString('hex'), // Ensures uniqueness
-        },
-        config.JWT_ACCESS_SECRET,
-        { expiresIn: config.ACCESS_TOKEN_EXPIRES }
-    );
+  return jwt.sign(
+    {
+      id: user._id,
+      email: user.email,
+      role: user.role, // Added role for RBAC
+      isVerified: user.isVerified,
+      jti: crypto.randomBytes(16).toString('hex'), // Ensures uniqueness
+    },
+    config.JWT_ACCESS_SECRET,
+    { expiresIn: config.ACCESS_TOKEN_EXPIRES }
+  );
 };
 
 const generateRefreshToken = (user, rememberMe = false) => {
-    const expiresIn = rememberMe ? '30d' : config.REFRESH_TOKEN_EXPIRES;
+  const expiresIn = rememberMe ? '30d' : config.REFRESH_TOKEN_EXPIRES;
 
-    return jwt.sign(
-        {
-            id: user._id,
-            email: user.email,
-            role: user.role, // Added role for RBAC
-            rememberMe,
-            jti: crypto.randomBytes(16).toString('hex'), // Ensures uniqueness
-        },
-        config.JWT_REFRESH_SECRET,
-        { expiresIn }
-    );
+  return jwt.sign(
+    {
+      id: user._id,
+      email: user.email,
+      role: user.role, // Added role for RBAC
+      rememberMe,
+      jti: crypto.randomBytes(16).toString('hex'), // Ensures uniqueness
+    },
+    config.JWT_REFRESH_SECRET,
+    { expiresIn }
+  );
 };
 
 module.exports = { generateAccessToken, generateRefreshToken };
-

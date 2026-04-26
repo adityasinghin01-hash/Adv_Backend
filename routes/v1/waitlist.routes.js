@@ -1,7 +1,11 @@
 const express = require('express');
 const router = express.Router();
 const { body } = require('express-validator');
-const { joinWaitlist, getWaitlist, exportWaitlist } = require('../../controllers/waitlistController');
+const {
+  joinWaitlist,
+  getWaitlist,
+  exportWaitlist,
+} = require('../../controllers/waitlistController');
 const rateLimit = require('express-rate-limit');
 const { protect: authMiddleware } = require('../../middleware/authMiddleware');
 const { authorize } = require('../../middleware/rbacMiddleware');
@@ -20,12 +24,16 @@ const waitlistLimiter = rateLimit({
 const joinValidation = [
   body('name')
     .trim()
-    .notEmpty().withMessage('Name is required.')
-    .isLength({ max: 100 }).withMessage('Name must be under 100 characters.'),
+    .notEmpty()
+    .withMessage('Name is required.')
+    .isLength({ max: 100 })
+    .withMessage('Name must be under 100 characters.'),
   body('email')
     .trim()
-    .notEmpty().withMessage('Email is required.')
-    .isEmail().withMessage('Please provide a valid email address.')
+    .notEmpty()
+    .withMessage('Email is required.')
+    .isEmail()
+    .withMessage('Please provide a valid email address.')
     .normalizeEmail({ gmail_remove_dots: false }),
 ];
 

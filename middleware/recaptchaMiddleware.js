@@ -6,31 +6,31 @@ const config = require('../config/config');
 const logger = require('../config/logger');
 
 const verifyRecaptcha = async (req, res, next) => {
-    const { recaptchaToken } = req.body;
+  const { recaptchaToken } = req.body;
 
-    // Dev bypass — only works in development, only with exact magic string
-    if (config.NODE_ENV === 'development' && recaptchaToken === 'dev-bypass') {
-        return next();
+  // Dev bypass — only works in development, only with exact magic string
+  if (config.NODE_ENV === 'development' && recaptchaToken === 'dev-bypass') {
+    return next();
+  }
+
+  if (!recaptchaToken) {
+    return res.status(400).json({ message: 'reCAPTCHA token is required' });
+  }
+
+  try {
+    const url = `https://www.google.com/recaptcha/api/siteverify?secret=${config.RECAPTCHA_SECRET}&response=${recaptchaToken}`;
+    const response = await fetch(url, { method: 'POST' });
+    const data = await response.json();
+
+    if (!data.success) {
+      return res.status(400).json({ message: 'reCAPTCHA verification failed' });
     }
 
-    if (!recaptchaToken) {
-        return res.status(400).json({ message: 'reCAPTCHA token is required' });
-    }
-
-    try {
-        const url = `https://www.google.com/recaptcha/api/siteverify?secret=${config.RECAPTCHA_SECRET}&response=${recaptchaToken}`;
-        const response = await fetch(url, { method: 'POST' });
-        const data = await response.json();
-
-        if (!data.success) {
-            return res.status(400).json({ message: 'reCAPTCHA verification failed' });
-        }
-
-        next();
-    } catch (error) {
-        logger.error('reCAPTCHA verification error', { error: error.message });
-        return res.status(500).json({ message: 'reCAPTCHA verification error' });
-    }
+    next();
+  } catch (error) {
+    logger.error('reCAPTCHA verification error', { error: error.message });
+    return res.status(500).json({ message: 'reCAPTCHA verification error' });
+  }
 };
 
 module.exports = { verifyRecaptcha };

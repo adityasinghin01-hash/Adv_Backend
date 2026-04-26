@@ -5,7 +5,12 @@ const fs = require('fs');
 const path = require('path');
 
 const AUTH_CONTROLLER_PATH = path.join(__dirname, '..', 'controllers', 'authController.js');
-const VERIFICATION_CONTROLLER_PATH = path.join(__dirname, '..', 'controllers', 'verificationController.js');
+const VERIFICATION_CONTROLLER_PATH = path.join(
+  __dirname,
+  '..',
+  'controllers',
+  'verificationController.js'
+);
 
 describe('Verification Token Expiry — Consistency Check', () => {
   let authSource, verificationSource;
@@ -17,11 +22,15 @@ describe('Verification Token Expiry — Consistency Check', () => {
 
   test('authController VERIFICATION_TOKEN_EXPIRY must be 24 hours (86400000 ms)', () => {
     // 24 * 60 * 60 * 1000 = 86400000
-    expect(authSource).toMatch(/VERIFICATION_TOKEN_EXPIRY\s*=\s*24\s*\*\s*60\s*\*\s*60\s*\*\s*1000/);
+    expect(authSource).toMatch(
+      /VERIFICATION_TOKEN_EXPIRY\s*=\s*24\s*\*\s*60\s*\*\s*60\s*\*\s*1000/
+    );
   });
 
   test('verificationController VERIFICATION_TOKEN_EXPIRY must be 24 hours (86400000 ms)', () => {
-    expect(verificationSource).toMatch(/VERIFICATION_TOKEN_EXPIRY\s*=\s*24\s*\*\s*60\s*\*\s*60\s*\*\s*1000/);
+    expect(verificationSource).toMatch(
+      /VERIFICATION_TOKEN_EXPIRY\s*=\s*24\s*\*\s*60\s*\*\s*60\s*\*\s*1000/
+    );
   });
 
   test('both controllers must define the same expiry constant', () => {

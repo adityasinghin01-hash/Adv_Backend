@@ -150,9 +150,15 @@ exports.updateWebhook = async (req, res, next) => {
       webhook.events = events;
     }
 
-    if (url !== undefined) {webhook.url = url;}
-    if (description !== undefined) {webhook.description = description;}
-    if (isActive !== undefined) {webhook.isActive = isActive;}
+    if (url !== undefined) {
+      webhook.url = url;
+    }
+    if (description !== undefined) {
+      webhook.description = description;
+    }
+    if (isActive !== undefined) {
+      webhook.isActive = isActive;
+    }
 
     await webhook.save();
 
@@ -285,9 +291,11 @@ exports.testWebhook = async (req, res, next) => {
     }
 
     // Dispatch directly to this specific webhook — not via emit() which broadcasts to ALL user webhooks
-    dispatchWithRetry(webhook, 'webhook.test', { message: 'Test delivery from Adv_Backend' }).catch((err) => {
-      logger.error('Test webhook dispatch error', { webhookId: webhook._id, error: err.message });
-    });
+    dispatchWithRetry(webhook, 'webhook.test', { message: 'Test delivery from Adv_Backend' }).catch(
+      (err) => {
+        logger.error('Test webhook dispatch error', { webhookId: webhook._id, error: err.message });
+      }
+    );
 
     logger.info('Webhook test triggered', { webhookId: webhook._id, userId: req.user.id });
 

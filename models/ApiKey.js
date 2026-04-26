@@ -4,53 +4,53 @@
 const mongoose = require('mongoose');
 
 const apiKeySchema = new mongoose.Schema(
-    {
-        userId: {
-            type: mongoose.Schema.Types.ObjectId,
-            ref: 'User',
-            required: true,
-            index: true,
-        },
-        name: {
-            type: String,
-            required: true,
-            trim: true,
-            maxlength: [50, 'API Key name cannot exceed 50 characters'],
-        },
-        keyHash: {
-            type: String,
-            required: true,
-            unique: true, // SHA-256 HMAC of the raw key
-        },
-        keyPrefix: {
-            type: String,
-            required: true, // For UI display (e.g., "sk_live_a1b2c3d4")
-        },
-        scopes: {
-            type: [String],
-            default: ['api:read'], // Default least-privilege scope
-        },
-        lastUsedAt: {
-            type: Date,
-            default: null,
-        },
-        expiresAt: {
-            type: Date,
-            default: null, // null = never expires
-        },
-        isActive: {
-            type: Boolean,
-            default: true,
-        },
-        usageCount: {
-            type: Number,
-            default: 0,
-            min: 0,
-        },
+  {
+    userId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+      required: true,
+      index: true,
     },
-    {
-        timestamps: true,
-    }
+    name: {
+      type: String,
+      required: true,
+      trim: true,
+      maxlength: [50, 'API Key name cannot exceed 50 characters'],
+    },
+    keyHash: {
+      type: String,
+      required: true,
+      unique: true, // SHA-256 HMAC of the raw key
+    },
+    keyPrefix: {
+      type: String,
+      required: true, // For UI display (e.g., "sk_live_a1b2c3d4")
+    },
+    scopes: {
+      type: [String],
+      default: ['api:read'], // Default least-privilege scope
+    },
+    lastUsedAt: {
+      type: Date,
+      default: null,
+    },
+    expiresAt: {
+      type: Date,
+      default: null, // null = never expires
+    },
+    isActive: {
+      type: Boolean,
+      default: true,
+    },
+    usageCount: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+  },
+  {
+    timestamps: true,
+  }
 );
 
 // Compound index to quickly fetch active keys for a specific user

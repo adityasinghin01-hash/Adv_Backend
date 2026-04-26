@@ -36,10 +36,7 @@ describe('Schema Bounds — maxlength on String Fields', () => {
       for (const field of fields) {
         // The field definition block should contain maxlength
         // Look for the field name followed by a block containing maxlength
-        const fieldRegex = new RegExp(
-          `${field}\\s*:\\s*\\{[^}]*maxlength`,
-          's'
-        );
+        const fieldRegex = new RegExp(`${field}\\s*:\\s*\\{[^}]*maxlength`, 's');
         expect(source).toMatch(fieldRegex);
       }
     }

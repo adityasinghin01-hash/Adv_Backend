@@ -19,16 +19,18 @@ app.set('trust proxy', 1);
 
 // ── 1. Security Headers ───────────────────────────────────
 // TECH_DECISIONS §1.8: Explicit CSP config, not just defaults
-app.use(helmet({
+app.use(
+  helmet({
     contentSecurityPolicy: {
-        directives: {
-            defaultSrc: ["'self'"],
-            scriptSrc: ["'self'", "'unsafe-inline'"],   // Needed for verify/reset HTML pages
-            styleSrc: ["'self'", "'unsafe-inline'"],     // Needed for inline styles in HTML pages
-        },
+      directives: {
+        defaultSrc: ["'self'"],
+        scriptSrc: ["'self'", "'unsafe-inline'"], // Needed for verify/reset HTML pages
+        styleSrc: ["'self'", "'unsafe-inline'"], // Needed for inline styles in HTML pages
+      },
     },
-    crossOriginEmbedderPolicy: false,   // Not needed for API-only backend
-}));
+    crossOriginEmbedderPolicy: false, // Not needed for API-only backend
+  })
+);
 
 // ── 1b. Additional Security Headers ──────────────────────
 // Supplements helmet with COEP, COOP, CORP, Permissions-Policy
@@ -36,13 +38,15 @@ app.use(securityHeaders);
 
 // ── 2. CORS (whitelist only) ──────────────────────────────
 // Fixes B-08: old version had cors() with zero config — allowed every origin
-app.use(cors({
+app.use(
+  cors({
     origin: config.ALLOWED_ORIGINS,
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'],
     allowedHeaders: ['Content-Type', 'Authorization', 'X-API-Key'],
     maxAge: 86400, // Cache preflight for 24h
-}));
+  })
+);
 
 // ── 3. Body Parser (with size limit) ─────────────────────
 // Fixes B-21: old version had no body size limit — DoS vector

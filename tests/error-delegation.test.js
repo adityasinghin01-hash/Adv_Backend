@@ -7,23 +7,29 @@ const path = require('path');
 
 const CONTROLLERS = [
   { name: 'blogController', path: path.join(__dirname, '..', 'controllers', 'blogController.js') },
-  { name: 'contactController', path: path.join(__dirname, '..', 'controllers', 'contactController.js') },
-  { name: 'newsletterController', path: path.join(__dirname, '..', 'controllers', 'newsletterController.js') },
-  { name: 'waitlistController', path: path.join(__dirname, '..', 'controllers', 'waitlistController.js') },
+  {
+    name: 'contactController',
+    path: path.join(__dirname, '..', 'controllers', 'contactController.js'),
+  },
+  {
+    name: 'newsletterController',
+    path: path.join(__dirname, '..', 'controllers', 'newsletterController.js'),
+  },
+  {
+    name: 'waitlistController',
+    path: path.join(__dirname, '..', 'controllers', 'waitlistController.js'),
+  },
 ];
 
 describe('Error Delegation — All Controllers Use next(err)', () => {
-  test.each(CONTROLLERS)(
-    '$name must NOT contain res.status(500)',
-    ({ path: filePath }) => {
-      const source = fs.readFileSync(filePath, 'utf-8');
-      const lines = source.split('\n');
-      const violations = lines.filter(
-        (line) => /res\.status\s*\(\s*500\s*\)/.test(line) && !line.trim().startsWith('//')
-      );
-      expect(violations).toEqual([]);
-    }
-  );
+  test.each(CONTROLLERS)('$name must NOT contain res.status(500)', ({ path: filePath }) => {
+    const source = fs.readFileSync(filePath, 'utf-8');
+    const lines = source.split('\n');
+    const violations = lines.filter(
+      (line) => /res\.status\s*\(\s*500\s*\)/.test(line) && !line.trim().startsWith('//')
+    );
+    expect(violations).toEqual([]);
+  });
 
   test.each(CONTROLLERS)(
     '$name all async handler functions must accept (req, res, next)',

@@ -15,9 +15,8 @@ const skip = (req) => req.originalUrl === '/api/health';
 morgan.token('request-id', (req) => req.id || '-');
 
 const httpLogger = morgan(
-    ':request-id :method :url :status :res[content-length] - :response-time ms [:remote-addr]',
-    { stream, skip }
+  ':request-id :method :url :status :res[content-length] - :response-time ms [:remote-addr]',
+  { stream, skip }
 );
 
 module.exports = { httpLogger };
-

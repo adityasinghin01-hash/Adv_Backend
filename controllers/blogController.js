@@ -101,11 +101,21 @@ const updatePost = async (req, res, next) => {
       post.title = title;
     }
 
-    if (content !== undefined) {post.content = content;}
-    if (excerpt !== undefined) {post.excerpt = excerpt;}
-    if (author !== undefined) {post.author = author;}
-    if (tags !== undefined) {post.tags = tags;}
-    if (published !== undefined) {post.published = published;}
+    if (content !== undefined) {
+      post.content = content;
+    }
+    if (excerpt !== undefined) {
+      post.excerpt = excerpt;
+    }
+    if (author !== undefined) {
+      post.author = author;
+    }
+    if (tags !== undefined) {
+      post.tags = tags;
+    }
+    if (published !== undefined) {
+      post.published = published;
+    }
 
     await post.save();
 

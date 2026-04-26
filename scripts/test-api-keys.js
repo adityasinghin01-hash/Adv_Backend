@@ -30,17 +30,22 @@ function request(method, path, headers = {}, body = null) {
     const req = http.request(opts, (res) => {
       req.setTimeout(0);
       let chunks = '';
-      res.on('data', d => chunks += d);
+      res.on('data', (d) => (chunks += d));
       res.on('end', () => {
-        try { resolve({ status: res.statusCode, data: JSON.parse(chunks) }); }
-        catch { resolve({ status: res.statusCode, data: chunks }); }
+        try {
+          resolve({ status: res.statusCode, data: JSON.parse(chunks) });
+        } catch {
+          resolve({ status: res.statusCode, data: chunks });
+        }
       });
     });
     req.setTimeout(REQUEST_TIMEOUT, () => {
       req.destroy(new Error('Request timeout'));
     });
     req.on('error', reject);
-    if (data) {req.write(data);}
+    if (data) {
+      req.write(data);
+    }
     req.end();
   });
 }
@@ -49,30 +54,51 @@ function request(method, path, headers = {}, body = null) {
  * Simple retry wrapper for the `request` helper.
  * Retries on HTTP 429 (Too Many Requests) with exponential back‑off.
  */
-async function requestWithRetry(method, path, headers = {}, body = null, retries = 3, backoff = 2000) {
+async function requestWithRetry(
+  method,
+  path,
+  headers = {},
+  body = null,
+  retries = 3,
+  backoff = 2000
+) {
   let attempt = 0;
   while (true) {
     const resp = await request(method, path, headers, body);
-    if (resp.status !== 429 || attempt >= retries) {return resp;}
+    if (resp.status !== 429 || attempt >= retries) {
+      return resp;
+    }
     attempt++;
     const wait = backoff * Math.pow(2, attempt - 1);
     console.log(`⏳ Received 429 – retry ${attempt}/${retries} after ${wait} ms`);
-    await new Promise(r => setTimeout(r, wait));
+    await new Promise((r) => setTimeout(r, wait));
   }
 }
 
 (async () => {
-  let pass = 0, fail = 0;
+  let pass = 0,
+    fail = 0;
   const assert = (test, name) => {
-    if (test) { pass++; console.log(`  ✅ ${name}`); }
-    else { fail++; console.log(`  ❌ ${name}`); }
+    if (test) {
+      pass++;
+      console.log(`  ✅ ${name}`);
+    } else {
+      fail++;
+      console.log(`  ❌ ${name}`);
+    }
   };
 
   // Step 1: Login
   console.log('\n=== Step 1: Login ===');
-  const login = await requestWithRetry('POST', '/api/v1/login', {}, {
-    email, password
-  });
+  const login = await requestWithRetry(
+    'POST',
+    '/api/v1/login',
+    {},
+    {
+      email,
+      password,
+    }
+  );
   assert(login.status === 200, `Login → ${login.status} (expected 200)`);
   const TOKEN = login.data.accessToken;
 
@@ -92,13 +118,13 @@ async function requestWithRetry(method, path, headers = {}, body = null, retries
   console.log('\n=== Step 4a: Cleanup existing keys ===');
   try {
     const existing = await requestWithRetry('GET', '/api/v1/apikeys', {
-      Authorization: `Bearer ${TOKEN}`
+      Authorization: `Bearer ${TOKEN}`,
     });
     if (existing.status === 200 && Array.isArray(existing?.data?.data)) {
       for (const k of existing.data.data) {
         const id = k._id || k.id;
         const del = await requestWithRetry('DELETE', `/api/v1/apikeys/${id}`, {
-          Authorization: `Bearer ${TOKEN}`
+          Authorization: `Bearer ${TOKEN}`,
         });
         if (del.status === 200) {
           console.log(`  🧹 Deleted existing key: ${id}`);
@@ -117,11 +143,16 @@ async function requestWithRetry(method, path, headers = {}, body = null, retries
 
   // Step 4: Create API key
   console.log('\n=== Step 4: Create API key ===');
-  const create = await requestWithRetry('POST', '/api/v1/apikeys', {
-    Authorization: `Bearer ${TOKEN}`
-  }, { name: 'Review Smoke Test', scopes: ['api:read'] });
+  const create = await requestWithRetry(
+    'POST',
+    '/api/v1/apikeys',
+    {
+      Authorization: `Bearer ${TOKEN}`,
+    },
+    { name: 'Review Smoke Test', scopes: ['api:read'] }
+  );
   assert(create.status === 201, `Create → ${create.status} (expected 201)`);
-  
+
   if (create.status !== 201 || !create?.data?.data) {
     console.error('❌ FATAL: API Key creation failed or missing data. Payload:', create?.data);
     process.exit(1);
@@ -142,7 +173,7 @@ async function requestWithRetry(method, path, headers = {}, body = null, retries
   // Step 5: List keys
   console.log('\n=== Step 5: List keys via JWT ===');
   const list = await requestWithRetry('GET', '/api/v1/apikeys', {
-    Authorization: `Bearer ${TOKEN}`
+    Authorization: `Bearer ${TOKEN}`,
   });
   assert(list.status === 200, `List → ${list.status} (expected 200)`);
   if (!list?.data || list.data.count === undefined) {
@@ -154,21 +185,21 @@ async function requestWithRetry(method, path, headers = {}, body = null, retries
   // Step 6: X-API-Key on JWT-only route → 401 (no implicit fallback)
   console.log('\n=== Step 6: X-API-Key on JWT-only route → 401 ===');
   const noFallback = await requestWithRetry('GET', '/api/v1/profile', {
-    'X-API-Key': RAW_KEY
+    'X-API-Key': RAW_KEY,
   });
   assert(noFallback.status === 401, `No fallback → ${noFallback.status} (expected 401)`);
 
   // Step 7: Revoke key
   console.log('\n=== Step 7: Revoke key ===');
   const revoke = await requestWithRetry('DELETE', `/api/v1/apikeys/${KEY_ID}`, {
-    Authorization: `Bearer ${TOKEN}`
+    Authorization: `Bearer ${TOKEN}`,
   });
   assert(revoke.status === 200, `Revoke → ${revoke.status} (expected 200)`);
 
   // Step 8: Verify revoked key no longer appears in active list
   console.log('\n=== Step 8: Revoked key absent from list ===');
   const postRevoke = await requestWithRetry('GET', '/api/v1/apikeys', {
-    Authorization: `Bearer ${TOKEN}`
+    Authorization: `Bearer ${TOKEN}`,
   });
   assert(postRevoke.status === 200, `List after revoke → ${postRevoke.status} (expected 200)`);
 
@@ -177,9 +208,7 @@ async function requestWithRetry(method, path, headers = {}, body = null, retries
     process.exit(1);
   }
 
-  const revokedStillListed = postRevoke.data.data.some(
-    k => String(k._id) === String(KEY_ID)
-  );
+  const revokedStillListed = postRevoke.data.data.some((k) => String(k._id) === String(KEY_ID));
   assert(!revokedStillListed, `Revoked key absent from active list`);
 
   // Summary

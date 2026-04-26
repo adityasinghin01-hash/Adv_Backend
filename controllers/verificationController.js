@@ -19,10 +19,10 @@ const VERIFICATION_TOKEN_EXPIRY = 24 * 60 * 60 * 1000; // 24 hours
 // GET /api/verify-email?token=<rawToken>
 // Returns HTML page (not JSON) — this is opened in a browser from the email link.
 const verifyEmail = async (req, res, next) => {
-    try {
-        const { token } = req.query;
+  try {
+    const { token } = req.query;
 
-        const errorHtml = `<!DOCTYPE html>
+    const errorHtml = `<!DOCTYPE html>
 <html>
 <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Verification Failed</title>
 <style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:Arial,sans-serif;background:linear-gradient(135deg,#f093fb,#f5576c);min-height:100vh;display:flex;align-items:center;justify-content:center}.card{background:white;border-radius:20px;padding:50px 40px;text-align:center;max-width:420px;width:90%;box-shadow:0 20px 60px rgba(0,0,0,0.2)}.icon{font-size:64px;margin-bottom:20px}h1{color:#333;font-size:26px;margin-bottom:12px}p{color:#666;font-size:15px;line-height:1.6;margin-bottom:30px}.btn{background:linear-gradient(135deg,#f093fb,#f5576c);color:white;text-decoration:none;padding:16px 40px;border-radius:10px;font-size:16px;font-weight:600;display:inline-block}</style>
@@ -37,41 +37,44 @@ const verifyEmail = async (req, res, next) => {
 </body>
 </html>`;
 
-        if (!token) {
-            return res.status(400).send(errorHtml);
-        }
+    if (!token) {
+      return res.status(400).send(errorHtml);
+    }
 
-        // Hash the incoming raw token to compare with DB (fixes B-03)
-        const hashedToken = hashToken(token);
+    // Hash the incoming raw token to compare with DB (fixes B-03)
+    const hashedToken = hashToken(token);
 
-        // Query with expiry check (fixes B-05)
-        const user = await User.findOne({
-            verificationToken: hashedToken,
-            verificationTokenExpiry: { $gt: Date.now() },
-        });
+    // Query with expiry check (fixes B-05)
+    const user = await User.findOne({
+      verificationToken: hashedToken,
+      verificationTokenExpiry: { $gt: Date.now() },
+    });
 
-        if (!user) {
-            return res.status(400).send(errorHtml);
-        }
+    if (!user) {
+      return res.status(400).send(errorHtml);
+    }
 
-        // Mark as verified, clear token fields
-        user.isVerified = true;
-        user.verificationToken = undefined;
-        user.verificationTokenExpiry = undefined;
+    // Mark as verified, clear token fields
+    user.isVerified = true;
+    user.verificationToken = undefined;
+    user.verificationTokenExpiry = undefined;
 
-        await user.save();
+    await user.save();
 
-        emit(WEBHOOK_EVENTS.USER_VERIFIED, {
-            id: user._id,
-            name: user.name,
-            role: user.role,
-        }, user._id);
+    emit(
+      WEBHOOK_EVENTS.USER_VERIFIED,
+      {
+        id: user._id,
+        name: user.name,
+        role: user.role,
+      },
+      user._id
+    );
 
-        const source = req.query.source || 'app';
+    const source = req.query.source || 'app';
 
-
-        if (source === 'web') {
-          return res.send(`<!DOCTYPE html>
+    if (source === 'web') {
+      return res.send(`<!DOCTYPE html>
 <html>
   <head>
     <title>Email Verified — Spinx</title>
@@ -103,8 +106,8 @@ const verifyEmail = async (req, res, next) => {
     </script>
   </body>
 </html>`);
-        } else {
-          return res.send(`<!DOCTYPE html>
+    } else {
+      return res.send(`<!DOCTYPE html>
 <html>
   <head>
     <title>Email Verified — Spinx</title>
@@ -128,10 +131,10 @@ const verifyEmail = async (req, res, next) => {
     </div>
   </body>
 </html>`);
-        }
-    } catch (error) {
-        next(error);
     }
+  } catch (error) {
+    next(error);
+  }
 };
 
 // ── Resend Verification Email ────────────────────────────
@@ -139,48 +142,48 @@ const verifyEmail = async (req, res, next) => {
 // POST /api/resend-verification { email }
 // Generic response regardless of user existence — fixes B-18 pattern.
 const resendVerification = async (req, res, next) => {
-    try {
-        const email = req.body.email?.toLowerCase()?.trim();
+  try {
+    const email = req.body.email?.toLowerCase()?.trim();
 
-        if (!email || !validator.isEmail(email)) {
-            return res.status(400).json({ message: 'Please provide a valid email address' });
-        }
-
-        const user = await User.findOne({ email });
-
-        // Generic response for both non-existent users AND already-verified users
-        // Prevents account enumeration (fixes B-18)
-        if (!user || user.isVerified) {
-            return res.status(200).json({
-                success: true,
-                message: 'If an account exists and is unverified, a verification email has been sent.',
-            });
-        }
-
-        // Generate new verification token
-        const rawToken = crypto.randomBytes(32).toString('hex');
-        user.verificationToken = hashToken(rawToken); // SHA-256 (fixes B-03)
-        user.verificationTokenExpiry = Date.now() + VERIFICATION_TOKEN_EXPIRY; // 15 min (fixes B-07)
-
-        await user.save();
-
-        // Send email (not async — we want to confirm it sent before responding)
-        try {
-            logger.info('Attempting to send verification email (resend)', { email });
-            await sendVerificationEmail(email, rawToken);
-            logger.info('Verification email sent (resend)', { email });
-        } catch (err) {
-            logger.error('Verification email send failed (resend)', { email, error: err.message });
-            // Even if email fails, we return a generic success to prevent enumeration
-        }
-
-        return res.status(200).json({
-            success: true,
-            message: 'If an account exists and is unverified, a verification email has been sent.',
-        });
-    } catch (error) {
-        next(error);
+    if (!email || !validator.isEmail(email)) {
+      return res.status(400).json({ message: 'Please provide a valid email address' });
     }
+
+    const user = await User.findOne({ email });
+
+    // Generic response for both non-existent users AND already-verified users
+    // Prevents account enumeration (fixes B-18)
+    if (!user || user.isVerified) {
+      return res.status(200).json({
+        success: true,
+        message: 'If an account exists and is unverified, a verification email has been sent.',
+      });
+    }
+
+    // Generate new verification token
+    const rawToken = crypto.randomBytes(32).toString('hex');
+    user.verificationToken = hashToken(rawToken); // SHA-256 (fixes B-03)
+    user.verificationTokenExpiry = Date.now() + VERIFICATION_TOKEN_EXPIRY; // 15 min (fixes B-07)
+
+    await user.save();
+
+    // Send email (not async — we want to confirm it sent before responding)
+    try {
+      logger.info('Attempting to send verification email (resend)', { email });
+      await sendVerificationEmail(email, rawToken);
+      logger.info('Verification email sent (resend)', { email });
+    } catch (err) {
+      logger.error('Verification email send failed (resend)', { email, error: err.message });
+      // Even if email fails, we return a generic success to prevent enumeration
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: 'If an account exists and is unverified, a verification email has been sent.',
+    });
+  } catch (error) {
+    next(error);
+  }
 };
 
 // ── Check Verification Status ────────────────────────────
@@ -188,24 +191,24 @@ const resendVerification = async (req, res, next) => {
 // GET /api/check-verification-status?email=<email>
 // Returns 200 with { isVerified: false } for non-existent users — fixes B-18.
 const checkVerificationStatus = async (req, res, next) => {
-    try {
-        const email = req.query.email?.toLowerCase()?.trim();
+  try {
+    const email = req.query.email?.toLowerCase()?.trim();
 
-        if (!email || !validator.isEmail(email)) {
-            return res.status(400).json({ message: 'Please provide a valid email address' });
-        }
-
-        const user = await User.findOne({ email });
-
-        // Same response for non-existent users — prevents enumeration (fixes B-18)
-        if (!user) {
-            return res.status(200).json({ success: true, isVerified: false });
-        }
-
-        return res.status(200).json({ success: true, isVerified: user.isVerified });
-    } catch (error) {
-        next(error);
+    if (!email || !validator.isEmail(email)) {
+      return res.status(400).json({ message: 'Please provide a valid email address' });
     }
+
+    const user = await User.findOne({ email });
+
+    // Same response for non-existent users — prevents enumeration (fixes B-18)
+    if (!user) {
+      return res.status(200).json({ success: true, isVerified: false });
+    }
+
+    return res.status(200).json({ success: true, isVerified: user.isVerified });
+  } catch (error) {
+    next(error);
+  }
 };
 
 module.exports = { verifyEmail, resendVerification, checkVerificationStatus };

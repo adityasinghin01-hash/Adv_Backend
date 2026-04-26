@@ -53,17 +53,20 @@ describe('htmlEscape Utility', () => {
 
 describe('Email Templates — htmlEscape Usage', () => {
   const CONTROLLERS_TO_CHECK = [
-    { name: 'contactController', path: path.join(__dirname, '..', 'controllers', 'contactController.js') },
-    { name: 'waitlistController', path: path.join(__dirname, '..', 'controllers', 'waitlistController.js') },
+    {
+      name: 'contactController',
+      path: path.join(__dirname, '..', 'controllers', 'contactController.js'),
+    },
+    {
+      name: 'waitlistController',
+      path: path.join(__dirname, '..', 'controllers', 'waitlistController.js'),
+    },
   ];
 
-  test.each(CONTROLLERS_TO_CHECK)(
-    '$name must import htmlEscape',
-    ({ path: filePath }) => {
-      const source = fs.readFileSync(filePath, 'utf-8');
-      expect(source).toMatch(/require\(.+htmlEscape.+\)/);
-    }
-  );
+  test.each(CONTROLLERS_TO_CHECK)('$name must import htmlEscape', ({ path: filePath }) => {
+    const source = fs.readFileSync(filePath, 'utf-8');
+    expect(source).toMatch(/require\(.+htmlEscape.+\)/);
+  });
 
   test('contactController must escape name, email, subject, and message in HTML', () => {
     const source = fs.readFileSync(

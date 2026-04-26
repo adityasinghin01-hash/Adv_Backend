@@ -10,26 +10,23 @@ const MAX_RETRIES = 3;
 const RETRY_DELAY = 5000; // 5 seconds
 
 const connectDB = async () => {
-    for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
-        try {
-            const conn = await mongoose.connect(config.MONGO_URI);
-            logger.info(`MongoDB Connected: ${conn.connection.host}`);
-            return;
-        } catch (error) {
-            logger.error(
-                `MongoDB connection attempt ${attempt}/${MAX_RETRIES} failed: ${error.message}`
-            );
+  for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+    try {
+      const conn = await mongoose.connect(config.MONGO_URI);
+      logger.info(`MongoDB Connected: ${conn.connection.host}`);
+      return;
+    } catch (error) {
+      logger.error(`MongoDB connection attempt ${attempt}/${MAX_RETRIES} failed: ${error.message}`);
 
-            if (attempt < MAX_RETRIES) {
-                logger.info(`Retrying in ${RETRY_DELAY / 1000}s...`);
-                await new Promise((resolve) => setTimeout(resolve, RETRY_DELAY));
-            }
-        }
+      if (attempt < MAX_RETRIES) {
+        logger.info(`Retrying in ${RETRY_DELAY / 1000}s...`);
+        await new Promise((resolve) => setTimeout(resolve, RETRY_DELAY));
+      }
     }
+  }
 
-    logger.error('All MongoDB connection attempts failed. Exiting.');
-    process.exit(1);
+  logger.error('All MongoDB connection attempts failed. Exiting.');
+  process.exit(1);
 };
 
 module.exports = connectDB;
-

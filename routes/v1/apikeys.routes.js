@@ -6,7 +6,7 @@ const router = express.Router();
 const apiKeyController = require('../../controllers/apiKeyController');
 const { protect } = require('../../middleware/authMiddleware');
 
-// SECURITY: All API key management routes require active JWT authentication 
+// SECURITY: All API key management routes require active JWT authentication
 // from a frontend session. API keys CANNOT be used to manage API keys.
 router.use(protect());
 

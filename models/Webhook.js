@@ -16,11 +16,12 @@ const webhookSchema = new mongoose.Schema(
       type: String,
       required: [true, 'Webhook URL is required.'],
       validate: {
-        validator: (v) => validatorLib.isURL(v, {
-          protocols: ['https'],
-          require_protocol: true,
-          require_tld: true,
-        }),
+        validator: (v) =>
+          validatorLib.isURL(v, {
+            protocols: ['https'],
+            require_protocol: true,
+            require_tld: true,
+          }),
         message: 'Webhook URL must be a valid HTTPS URL with a domain.',
       },
     },

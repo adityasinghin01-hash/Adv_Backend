@@ -122,9 +122,7 @@ describe('POST /api/v1/webhooks', () => {
 
 describe('GET /api/v1/webhooks', () => {
   it('should list webhooks and return 200 with count >= 1', async () => {
-    const res = await request(app)
-      .get('/api/v1/webhooks')
-      .set('Authorization', `Bearer ${token}`);
+    const res = await request(app).get('/api/v1/webhooks').set('Authorization', `Bearer ${token}`);
 
     expect(res.statusCode).toBe(200);
     expect(res.body.success).toBe(true);
