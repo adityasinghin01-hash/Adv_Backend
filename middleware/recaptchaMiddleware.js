@@ -2,6 +2,11 @@
 // Verifies Google reCAPTCHA token on signup and login.
 // Dev bypass: when NODE_ENV=development AND token='dev-bypass', skips verification.
 // TECH_DECISIONS §2.1: reCAPTCHA on BOTH signup AND login (fixes B-13).
+//
+// S-02 FIX: Secret passed via POST body (application/x-www-form-urlencoded),
+//           NOT as a URL query param — prevents secret leakage in access logs.
+// S-03 FIX: Enforce reCAPTCHA v3 score threshold (< 0.5 = bot) to prevent
+//           low-confidence tokens from bypassing bot protection.
 const config = require('../config/config');
 const logger = require('../config/logger');
 
@@ -18,11 +23,17 @@ const verifyRecaptcha = async (req, res, next) => {
   }
 
   try {
-    const url = `https://www.google.com/recaptcha/api/siteverify?secret=${config.RECAPTCHA_SECRET}&response=${recaptchaToken}`;
-    const response = await fetch(url, { method: 'POST' });
+    // S-02: Use POST body — secret never appears in URL/logs
+    const response = await fetch('https://www.google.com/recaptcha/api/siteverify', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: `secret=${encodeURIComponent(config.RECAPTCHA_SECRET)}&response=${encodeURIComponent(recaptchaToken)}`,
+    });
     const data = await response.json();
 
-    if (!data.success) {
+    // S-03: Check success AND score threshold for reCAPTCHA v3
+    // score is only present in v3; v2 omits it (treated as passing)
+    if (!data.success || (data.score !== undefined && data.score < 0.5)) {
       return res.status(400).json({ message: 'reCAPTCHA verification failed' });
     }
 

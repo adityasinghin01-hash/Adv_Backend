@@ -10,6 +10,13 @@ const logger = require('./config/logger');
 const { drainPendingUpdates } = require('./middleware/apiKeyMiddleware');
 const { startWebhookRetryWorker, stopWebhookRetryWorker } = require('./services/webhookService');
 
+// ── S-04: Production Fail-Fast ───────────────────────────────
+// Validates all required env vars are present before accepting traffic.
+// Throws immediately with a clear error message if any are missing.
+if (config.NODE_ENV === 'production') {
+  config.validateProductionConfig();
+}
+
 // ── Readiness Flag ───────────────────────────────────────────
 // Set to true only after DB connects. Used by /api/health/deep.
 app.locals.isReady = false;

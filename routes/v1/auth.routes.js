@@ -15,8 +15,10 @@ router.post('/signup', strictLimiter, schemas.signup, verifyRecaptcha, authContr
 // POST /api/v1/login
 router.post('/login', authLimiter, schemas.login, authController.login);
 
-// POST /api/v1/google-login — no per-route limiter (global only)
-router.post('/google-login', authController.googleLogin);
+// POST /api/v1/google-login
+// S-06 FIX: Added authLimiter — previously only global limiter applied,
+// allowing faster brute-force of Google OAuth ID tokens than /login.
+router.post('/google-login', authLimiter, authController.googleLogin);
 
 // POST /api/v1/logout
 router.post('/logout', authController.logout);

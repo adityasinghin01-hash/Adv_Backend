@@ -47,6 +47,34 @@ const config = {
 
   // reCAPTCHA
   RECAPTCHA_SECRET: process.env.RECAPTCHA_SECRET,
+
+  // Webhook
+  WEBHOOK_SECRET_KEY: process.env.WEBHOOK_SECRET_KEY,
+
+  // Verification token expiry
+  VERIFICATION_TOKEN_EXPIRY: process.env.VERIFICATION_TOKEN_EXPIRY || '24h',
+};
+
+// S-04 FIX: Production fail-fast validator.
+// Called from server.js on startup (before accepting traffic).
+// Also exported so tests can validate the function directly.
+// Throwing here kills the process immediately with a clear error message
+// rather than silently serving requests with undefined secrets.
+const PRODUCTION_REQUIRED_VARS = [
+  'MONGO_URI',
+  'JWT_ACCESS_SECRET',
+  'JWT_REFRESH_SECRET',
+  'API_KEY_SALT',
+  'BREVO_API_KEY',
+  'RECAPTCHA_SECRET',
+  'WEBHOOK_SECRET_KEY',
+];
+
+config.validateProductionConfig = function validateProductionConfig() {
+  const missing = PRODUCTION_REQUIRED_VARS.filter((k) => !config[k]);
+  if (missing.length) {
+    throw new Error(`FATAL: Missing required env vars in production: ${missing.join(', ')}`);
+  }
 };
 
 module.exports = config;
